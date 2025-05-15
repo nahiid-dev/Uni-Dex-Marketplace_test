@@ -10,10 +10,10 @@ async function main() {
     // --- Mainnet Addresses ---
     const UNISWAP_V3_FACTORY_MAINNET = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
     const POSITION_MANAGER_MAINNET = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
-    const SWAP_ROUTER_MAINNET = "0xE592427A0AEce92De3Edee1F18E0157C05861564"; // Mainnet SwapRouter (V3 Router 2)
     const WETH_MAINNET = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
     const USDC_MAINNET = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Mainnet USDC (6 decimals)
     const POOL_FEE = 500; // 0.05% fee tier for WETH/USDC (as per your file)
+    const INITIAL_RANGE_WIDTH_MULTIPLIER_BASELINE = 50; // Default or desired value
 
     const [deployer] = await hre.ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
@@ -42,19 +42,18 @@ async function main() {
     console.log("\nDeploying BaselineMinimal with parameters:");
     console.log("  Factory:", UNISWAP_V3_FACTORY_MAINNET);
     console.log("  Position Manager:", POSITION_MANAGER_MAINNET);
-    console.log("  Swap Router:", SWAP_ROUTER_MAINNET);
     console.log("  Token0 (constructor):", constructorToken0);
     console.log("  Token1 (constructor):", constructorToken1);
     console.log("  Fee Tier:", POOL_FEE);
-    console.log("  Initial Owner:", deployer.address);
+    console.log("  Initial Range Width Multiplier:", INITIAL_RANGE_WIDTH_MULTIPLIER_BASELINE);
 
     const baselineMinimal = await BaselineMinimal.deploy(
         UNISWAP_V3_FACTORY_MAINNET,
         POSITION_MANAGER_MAINNET,
-        SWAP_ROUTER_MAINNET,
         constructorToken0,
         constructorToken1,
-        POOL_FEE
+        POOL_FEE,
+        INITIAL_RANGE_WIDTH_MULTIPLIER_BASELINE
     );
     await baselineMinimal.deployed();
     const receipt = await baselineMinimal.deployTransaction.wait(1);

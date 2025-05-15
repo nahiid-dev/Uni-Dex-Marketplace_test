@@ -54,7 +54,7 @@ contract PredictiveLiquidityManager is
     Position public currentPosition;
 
     // Strategy Parameters
-    uint24 public rangeWidthMultiplier = 4;
+    uint24 public rangeWidthMultiplier;
 
     // --- Events ---
     // Event for liquidity operations
@@ -87,7 +87,8 @@ contract PredictiveLiquidityManager is
         address _token0,
         address _token1,
         uint24 _fee,
-        address _initialOwner
+        address _initialOwner,
+        uint24 _initialRangeWidthMultiplier
     ) {
         // Store values in immutable variables
         factory = IUniswapV3Factory(_factory);
@@ -95,6 +96,8 @@ contract PredictiveLiquidityManager is
         token0 = _token0;
         token1 = _token1;
         fee = _fee;
+        require(_initialRangeWidthMultiplier > 0, "Initial RWM must be > 0");
+        rangeWidthMultiplier = _initialRangeWidthMultiplier;
 
         // Check decimals using try-catch
         try IERC20Decimals(_token0).decimals() returns (uint8 _decimals) {
@@ -132,6 +135,14 @@ contract PredictiveLiquidityManager is
             transferOwnership(_initialOwner);
         }
     }
+    
+     // --- Function to set Range Width Multiplier ---
+     function setRangeWidthMultiplier(uint24 _newMultiplier) external onlyOwner {
+        require(_newMultiplier > 0, "RWM must be > 0");
+         // You can add a check for a maximum value if necessary
+        rangeWidthMultiplier = _newMultiplier;
+        emit StrategyParamUpdated("rangeWidthMultiplier", uint256(_newMultiplier));
+     }
 
     // --- Automated Liquidity Management (Owner Only) ---
     function updatePredictionAndAdjust(
@@ -142,7 +153,6 @@ contract PredictiveLiquidityManager is
         );
 
         bool adjusted = false;
-        // اگر موقعیت فعال است و بازه جدید خیلی نزدیک به قبلی است، موقعیت جدید ایجاد نشود
         if (
             currentPosition.active &&
             _isTickRangeClose(
@@ -152,7 +162,6 @@ contract PredictiveLiquidityManager is
                 targetTickUpper
             )
         ) {
-            // فقط رویداد ثبت شود
             _emitPredictionMetrics(
                 predictedTick,
                 targetTickLower,
@@ -162,7 +171,6 @@ contract PredictiveLiquidityManager is
             return;
         }
 
-        // در غیر این صورت، موقعیت جدید ایجاد شود
         adjusted = _updatePositionIfNeeded(targetTickLower, targetTickUpper);
 
         _emitPredictionMetrics(
@@ -173,39 +181,31 @@ contract PredictiveLiquidityManager is
         );
     }
 
-    // حذف محاسبه قیمت واقعی و فقط بازگرداندن بازه تیک
     function _calculateTicks(
         int24 targetCenterTick
     ) internal view returns (int24 tickLower, int24 tickUpper) {
         require(tickSpacing > 0, "Invalid tick spacing");
 
-        // Calculate half width with better symmetry
         int24 halfWidth = (tickSpacing * int24(rangeWidthMultiplier)) / 2;
         if (halfWidth <= 0) halfWidth = tickSpacing;
 
-        // Ensure half width is a multiple of tick spacing for perfect symmetry
         halfWidth = (halfWidth / tickSpacing) * tickSpacing;
         if (halfWidth == 0) halfWidth = tickSpacing;
 
-        // Calculate raw tick boundaries with better centering
         int24 rawTickLower = targetCenterTick - halfWidth;
         int24 rawTickUpper = targetCenterTick + halfWidth;
 
-        // Align with tick spacing
         tickLower = floorToTickSpacing(rawTickLower, tickSpacing);
         tickUpper = floorToTickSpacing(rawTickUpper, tickSpacing);
 
-        // If upper tick is not properly spaced after flooring, add another tick spacing
         if ((rawTickUpper % tickSpacing) != 0) {
             tickUpper += tickSpacing;
         }
 
-        // Ensure proper spacing between ticks
         if (tickLower >= tickUpper) {
             tickUpper = tickLower + tickSpacing;
         }
 
-        // Ensure ticks are within global range
         tickLower = tickLower < TickMath.MIN_TICK
             ? floorToTickSpacing(TickMath.MIN_TICK, tickSpacing)
             : tickLower;
@@ -214,11 +214,9 @@ contract PredictiveLiquidityManager is
             ? floorToTickSpacing(TickMath.MAX_TICK, tickSpacing)
             : tickUpper;
 
-        // Final check to ensure proper ordering
         if (tickLower >= tickUpper) {
             tickUpper = tickLower + tickSpacing;
 
-            // If upper tick exceeds MAX_TICK, adjust both
             if (tickUpper > TickMath.MAX_TICK) {
                 tickUpper = floorToTickSpacing(TickMath.MAX_TICK, tickSpacing);
                 tickLower = tickUpper - tickSpacing;
@@ -228,7 +226,6 @@ contract PredictiveLiquidityManager is
         return (tickLower, tickUpper);
     }
 
-    // کنترل نزدیکی بازه تیک‌ها (مثلاً اگر فاصله کمتر از یک بازه کامل باشد)
     function _isTickRangeClose(
         int24 oldLower,
         int24 oldUpper,
@@ -236,7 +233,6 @@ contract PredictiveLiquidityManager is
         int24 newUpper
     ) internal view returns (bool) {
         int24 minDiff = (tickSpacing * int24(rangeWidthMultiplier)) / 2;
-        // اگر هر دو لبه بازه جدید و قبلی خیلی نزدیک باشند، true برگردان
         return (_abs(oldLower - newLower) < minDiff &&
             _abs(oldUpper - newUpper) < minDiff);
     }
@@ -245,7 +241,6 @@ contract PredictiveLiquidityManager is
         return x >= 0 ? x : -x;
     }
 
-    // Helper function to update position if needed - reducing stack depth
     function _updatePositionIfNeeded(
         int24 targetTickLower,
         int24 targetTickUpper
@@ -416,7 +411,6 @@ contract PredictiveLiquidityManager is
         return compressed * _tickSpacing;
     }
 
-    // Helper function to emit prediction metrics event
     function _emitPredictionMetrics(
         int24 predictedTick,
         int24 finalTickLower,
@@ -435,19 +429,16 @@ contract PredictiveLiquidityManager is
         );
     }
 
-    // Implement IUniswapV3MintCallback interface
     function uniswapV3MintCallback(
         uint256 amount0Owed,
         uint256 amount1Owed,
         bytes calldata data
     ) external override {
-        // Verify the caller is the Uniswap V3 position manager
         require(
             msg.sender == address(positionManager),
             "Unauthorized callback"
         );
 
-        // Send the required tokens
         if (amount0Owed > 0) {
             IERC20(token0).safeTransfer(msg.sender, amount0Owed);
         }

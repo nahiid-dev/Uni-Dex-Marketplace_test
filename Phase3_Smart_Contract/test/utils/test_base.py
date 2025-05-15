@@ -101,10 +101,11 @@ class LiquidityTestBase(ABC):
         pass
 
     def execute_test_steps(self) -> bool:
-        """Execute all test steps sequentially."""
+        """Execute all test steps sequentially with required arguments."""
         try:
             logger.info("--- Test Step 1: Setup ---")
-            if not self.setup():
+            # Pass desired_range_width_multiplier=50 to setup()
+            if not self.setup(50):
                 logger.error("Setup failed. Aborting test.")
                 if hasattr(self, 'metrics') and self.metrics and hasattr(self, 'ACTION_STATES') and "SETUP_FAILED" in self.ACTION_STATES:
                     self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
@@ -116,7 +117,8 @@ class LiquidityTestBase(ABC):
             self.check_balances()
 
             logger.info("--- Test Step 3: Position Adjustment ---")
-            if not self.adjust_position():
+            # Pass target_weth_balance=1.0 and target_usdc_balance=1000.0 to adjust_position()
+            if not self.adjust_position(1.0, 1000.0):
                 logger.error("Position adjustment failed.")
                 return False
 

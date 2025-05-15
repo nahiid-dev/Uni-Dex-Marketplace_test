@@ -8,7 +8,8 @@
 # ==============================================
 
 # --- Configuration Section ---
-PROJECT_DIR="/root/Uniswap-Decentralized-Marketplace/Phase3_Smart_Contract"
+#PROJECT_DIR="/root/Uniswap-Decentralized-Marketplace/Phase3_Smart_Contract"
+PROJECT_DIR="/root/Uni-Dex-Marketplace_test/Phase3_Smart_Contract"
 LOG_FILE="$PROJECT_DIR/fork_test_run_$(date +%Y%m%d_%H%M%S).log"
 MAX_RETRIES=3
 RETRY_DELAY=10
