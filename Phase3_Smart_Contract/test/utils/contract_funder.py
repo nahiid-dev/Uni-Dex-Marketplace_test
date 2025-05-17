@@ -2,11 +2,11 @@ import logging
 import time
 from web3 import Web3
 from eth_account import Account
-from . import web3_utils
+from . import web3_utils # فرض بر این است که web3_utils در همین پکیج قرار دارد
 
 logger = logging.getLogger(__name__)
 
-MIN_GAS_FOR_TRANSFER = 50000
+MIN_GAS_FOR_TRANSFER = 50000 # مقدار پیش‌فرض گاز برای انتقال توکن
 
 def ensure_precise_token_balances(
     contract_address: str,
@@ -23,22 +23,34 @@ def ensure_precise_token_balances(
     Funds from the funding_account.
     """
     if not web3_utils.w3 or not web3_utils.w3.is_connected():
-        if not web3_utils.init_web3():
+        if not web3_utils.init_web3(): # init_web3 باید web3_utils.w3 را تنظیم کند
             logger.error("Web3 connection failed in ensure_precise_token_balances.")
             return False
     
-    w3 = web3_utils.w3
+    # از آخرین نمونه w3 از web3_utils استفاده کنید
+    w3 = web3_utils.w3 
+    if not w3: # بررسی اضافی اگر init_web3 موفقیت آمیز نباشد و w3 را برنگرداند
+        logger.error("Web3 instance is not available after initialization attempt.")
+        return False
+
     try:
         funding_account = Account.from_key(funding_account_private_key)
         contract_checksum_addr = Web3.to_checksum_address(contract_address)
+        funder_checksum_addr = Web3.to_checksum_address(funding_account.address)
+
 
         tokens_to_fund = [
             {"name": "Token0", "address": token0_address, "decimals": token0_decimals, "target_readable": target_token0_amount_readable},
             {"name": "Token1", "address": token1_address, "decimals": token1_decimals, "target_readable": target_token1_amount_readable},
         ]
 
+        current_nonce = w3.eth.get_transaction_count(funder_checksum_addr)
+
         for token_info in tokens_to_fund:
             token_contract = web3_utils.get_contract(token_info["address"], "IERC20")
+            if not token_contract:
+                logger.error(f"Failed to get contract instance for {token_info['name']} ({token_info['address']})")
+                return False
             
             target_wei = int(token_info["target_readable"] * (10**token_info["decimals"]))
             current_bal_wei = token_contract.functions.balanceOf(contract_checksum_addr).call()
@@ -46,39 +58,54 @@ def ensure_precise_token_balances(
             needed_wei = target_wei - current_bal_wei
 
             if needed_wei == 0:
-                logger.info(f"Contract already has target balance of {token_info['name']} ({token_info['target_readable']}).")
+                logger.info(f"Contract {contract_checksum_addr} already has target balance of {token_info['name']} ({token_info['target_readable']}).")
                 continue
             elif needed_wei < 0:
-                logger.warning(f"Contract has MORE {token_info['name']} ({current_bal_wei / (10**token_info['decimals'])}) than target ({token_info['target_readable']}). Manual adjustment might be needed if exactness is critical by reducing balance.")
+                # اگر موجودی فعلی بیشتر از هدف باشد، هشدار داده می‌شود.
+                # در این سناریو، معمولاً توکنی ارسال نمی‌شود مگر اینکه بخواهیم موجودی را کاهش دهیم.
+                actual_balance_readable = current_bal_wei / (10**token_info['decimals'])
+                logger.warning(f"Contract {contract_checksum_addr} has MORE {token_info['name']} ({actual_balance_readable}) than target ({token_info['target_readable']}). Skipping transfer for this token.")
                 continue
 
-            funder_bal_wei = token_contract.functions.balanceOf(funding_account.address).call()
+            funder_bal_wei = token_contract.functions.balanceOf(funder_checksum_addr).call()
+            funder_bal_readable = funder_bal_wei / (10**token_info['decimals'])
+            needed_readable = needed_wei / (10**token_info['decimals'])
+
             if funder_bal_wei < needed_wei:
-                logger.error(f"Funding account {funding_account.address} has insufficient {token_info['name']} to fund contract. Has: {funder_bal_wei / (10**token_info['decimals'])}, Needs: {needed_wei / (10**token_info['decimals'])}")
+                logger.error(f"Funding account {funder_checksum_addr} has insufficient {token_info['name']} to fund contract. Has: {funder_bal_readable}, Needs: {needed_readable}")
                 return False
 
-            logger.info(f"Funding contract {contract_address} with {needed_wei / (10**token_info['decimals']):.6f} of {token_info['name']}.")
+            logger.info(f"Funding contract {contract_checksum_addr} with {needed_readable:.6f} of {token_info['name']} from {funder_checksum_addr}.")
             
-            tx_params = {
-                'from': funding_account.address,
-                'nonce': w3.eth.get_transaction_count(funding_account.address),
-                'chainId': int(w3.net.version)
+            tx_params_dict = {
+                'from': funder_checksum_addr,
+                'nonce': current_nonce, # Nonce باید برای هر تراکنش افزایش یابد
+                'chainId': int(w3.net.version) 
             }
-            transfer_tx = token_contract.functions.transfer(contract_checksum_addr, needed_wei).build_transaction(tx_params)
+            
+            # ساخت تراکنش اولیه برای تخمین گاز
+            transfer_tx_build = token_contract.functions.transfer(contract_checksum_addr, needed_wei)
             
             try:
-                gas_estimate = w3.eth.estimate_gas(transfer_tx)
-                transfer_tx['gas'] = int(gas_estimate * 1.2)
+                # تخمین گاز قبل از افزودن به tx_params_dict
+                gas_estimate = transfer_tx_build.estimate_gas({'from': funder_checksum_addr, 'to': token_info["address"]})
+                tx_params_dict['gas'] = int(gas_estimate * 1.2) # افزودن بافر به گاز تخمینی
             except Exception as e:
-                logger.warning(f"Gas estimation failed for {token_info['name']} transfer: {e}. Using default.")
-                transfer_tx['gas'] = MIN_GAS_FOR_TRANSFER * 2
+                logger.warning(f"Gas estimation failed for {token_info['name']} transfer: {e}. Using default gas: {MIN_GAS_FOR_TRANSFER * 2}")
+                tx_params_dict['gas'] = MIN_GAS_FOR_TRANSFER * 2 # مقدار پیش‌فرض در صورت خطا
 
-            receipt = web3_utils.send_transaction(transfer_tx)
+            # ساخت نهایی تراکنش با پارامترهای کامل شامل گاز
+            final_transfer_tx = transfer_tx_build.build_transaction(tx_params_dict)
+
+            receipt = web3_utils.send_transaction(final_transfer_tx, funding_account_private_key) # ارسال کلید خصوصی به send_transaction
             if not receipt or receipt.status == 0:
-                logger.error(f"Failed to transfer {token_info['name']} to contract {contract_address}. TxHash: {receipt.transactionHash.hex() if receipt else 'N/A'}")
+                tx_hash_str = receipt.transactionHash.hex() if receipt else 'N/A'
+                logger.error(f"Failed to transfer {token_info['name']} to contract {contract_checksum_addr}. TxHash: {tx_hash_str}")
                 return False
-            logger.info(f"{token_info['name']} transfer successful to {contract_address}. TxHash: {receipt.transactionHash.hex()}")
-            time.sleep(1)
+            
+            logger.info(f"{token_info['name']} transfer successful to {contract_checksum_addr}. TxHash: {receipt.transactionHash.hex()}")
+            current_nonce += 1 # افزایش nonce برای تراکنش بعدی
+            time.sleep(0.5) # کاهش زمان انتظار یا حذف آن در صورت عدم نیاز
 
         return True
     except Exception as e:

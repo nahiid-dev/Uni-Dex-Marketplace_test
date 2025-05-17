@@ -129,7 +129,7 @@ def get_contract(address, contract_name):
         logger.exception(f"Error getting contract {contract_name} at {address}: {e}")
         raise
 
-def send_transaction(tx_params_dict): # Renamed to avoid conflict if tx_params is a function argument elsewhere
+def send_transaction(tx_params_dict, private_key):
     """Builds necessary fields, signs, sends a transaction and waits for receipt."""
     global w3
     if not w3 or not w3.is_connected():
@@ -137,8 +137,8 @@ def send_transaction(tx_params_dict): # Renamed to avoid conflict if tx_params i
             raise ConnectionError("Web3 connection failed or could not be established in send_transaction.")
 
     if 'from' not in tx_params_dict: raise ValueError("Transaction 'from' address missing")
-    if not PRIVATE_KEY:
-        logger.error("PRIVATE_KEY not found in environment variables for send_transaction.")
+    if not private_key:
+        logger.error("Private key not provided to send_transaction.")
         return None
 
     try:
@@ -152,7 +152,6 @@ def send_transaction(tx_params_dict): # Renamed to avoid conflict if tx_params i
         if 'gas' not in tx_params_dict:
             try:
                 tx_params_dict['gas'] = int(w3.eth.estimate_gas(tx_params_dict) * 1.25) # Add 25% buffer
-                # logger.debug(f"Estimated gas: {tx_params_dict['gas']}")
             except Exception as gas_err:
                 logger.error(f"Gas estimation failed: {gas_err}. Using default 1,000,000.")
                 tx_params_dict['gas'] = 1000000
@@ -165,17 +164,10 @@ def send_transaction(tx_params_dict): # Renamed to avoid conflict if tx_params i
                 tip = fee_history['reward'][-1][0] if fee_history['reward'] and fee_history['reward'][-1] else w3.to_wei(1, 'gwei') # Fallback tip
                 tx_params_dict['maxPriorityFeePerGas'] = tip
                 tx_params_dict['maxFeePerGas'] = base_fee * 2 + tip
-                # logger.debug(f"Using EIP-1559 gas: maxFeePerGas={tx_params_dict['maxFeePerGas']}, maxPriorityFeePerGas={tx_params_dict['maxPriorityFeePerGas']}")
             except:
                 tx_params_dict['gasPrice'] = int(w3.eth.gas_price * 1.1)
-                # logger.debug(f"Using legacy gasPrice: {tx_params_dict['gasPrice']}")
-        # elif 'gasPrice' in tx_params_dict:
-            # logger.debug(f"Using provided legacy gasPrice: {tx_params_dict['gasPrice']}")
-        # elif 'maxFeePerGas' in tx_params_dict:
-            # logger.debug(f"Using provided EIP-1559 gas: maxFeePerGas={tx_params_dict['maxFeePerGas']}, maxPriorityFeePerGas={tx_params_dict.get('maxPriorityFeePerGas')}")
 
-        # logger.debug(f"Final TX params before signing: {tx_params_dict}")
-        signed_tx = w3.eth.account.sign_transaction(tx_params_dict, PRIVATE_KEY)
+        signed_tx = w3.eth.account.sign_transaction(tx_params_dict, private_key)
         tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         logger.info(f"Transaction sent: {tx_hash.hex()}")
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
@@ -228,7 +220,7 @@ def wrap_eth_to_weth(amount_wei) -> bool:
         except:
             tx_dict['gasPrice'] = int(w3.eth.gas_price * 1.1)
 
-        receipt = send_transaction(tx_dict) # Use the main send_transaction helper
+        receipt = send_transaction(tx_dict, PRIVATE_KEY) # Use the main send_transaction helper
 
         if receipt and receipt.status == 1:
             logger.info(f"WETH wrap confirmed successfully.")

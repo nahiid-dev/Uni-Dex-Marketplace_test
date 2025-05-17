@@ -24,7 +24,7 @@ class LiquidityTestBase(ABC):
         self.token1_decimals = None
         # self.w3 will now be web3_utils.w3
 
-    def setup(self) -> bool:
+    def setup(self, desired_range_width_multiplier: int) -> bool:
         """Initialize connection and contracts."""
         try:
             # Ensure Web3 is initialized using the function from web3_utils
@@ -100,12 +100,11 @@ class LiquidityTestBase(ABC):
         """Abstract method for saving metrics. Implement in derived class."""
         pass
 
-    def execute_test_steps(self) -> bool:
+    def execute_test_steps(self, desired_range_width_multiplier: int = 50, target_weth_balance: float = 1.0, target_usdc_balance: float = 1000.0) -> bool:
         """Execute all test steps sequentially with required arguments."""
         try:
             logger.info("--- Test Step 1: Setup ---")
-            # Pass desired_range_width_multiplier=50 to setup()
-            if not self.setup(50):
+            if not self.setup(desired_range_width_multiplier):
                 logger.error("Setup failed. Aborting test.")
                 if hasattr(self, 'metrics') and self.metrics and hasattr(self, 'ACTION_STATES') and "SETUP_FAILED" in self.ACTION_STATES:
                     self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
@@ -117,8 +116,7 @@ class LiquidityTestBase(ABC):
             self.check_balances()
 
             logger.info("--- Test Step 3: Position Adjustment ---")
-            # Pass target_weth_balance=1.0 and target_usdc_balance=1000.0 to adjust_position()
-            if not self.adjust_position(1.0, 1000.0):
+            if not self.adjust_position(target_weth_balance, target_usdc_balance):
                 logger.error("Position adjustment failed.")
                 return False
 

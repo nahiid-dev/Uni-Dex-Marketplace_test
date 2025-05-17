@@ -1,0 +1,6 @@
+timestamp,contract_type,action_taken,tx_hash,range_width_multiplier_setting,predictedPrice_api,predictedTick_calculated,external_api_eth_price,actualPrice_pool,sqrtPriceX96_pool,currentTick_pool,targetTickLower_calculated,targetTickUpper_calculated,initial_contract_balance_token0,initial_contract_balance_token1,finalTickLower_contract,finalTickUpper_contract,liquidity_contract,amount0_provided_to_mint,amount1_provided_to_mint,fees_collected_token0,fees_collected_token1,gas_used,gas_cost_eth,error_message
+2025-05-17 07:44:42,Predictive,unexpected_error,,,,,,,0,0,0,0,,,0,0,0,,,,,0,0.0,LiquidityTestBase.execute_test_steps() got an unexpected keyword argument 'desired_range_width_multiplier'
+2025-05-17 13:02:51,Predictive,unexpected_error,,,,,,,0,0,0,0,,,0,0,0,,,,,0,0.0,
+2025-05-17 13:12:49,Predictive,unexpected_error,,,,,,,0,0,0,0,,,0,0,0,,,,,0,0.0,
+2025-05-17 13:22:45,Predictive,setup_failed,,50,,,,,0,0,0,0,,,0,0,0,,,,,0,0.0,Setup error: send_transaction() takes 1 positional argument but 2 were given
+2025-05-17 13:29:21,Predictive,tx_success_adjusted,db7acb3a95e6dd0f4a417b9af7ee5b74762b536ee59c230b35224b095da85251,50,2431.035259512663,-198360,,2.9653170678279655e+20,1364316565626712095697100696183249,195086,0,0,2000000000,1000000000000000000,-198610,-198110,811311656661997936475186,,,,,572501,0.001857023310245673,
