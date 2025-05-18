@@ -279,9 +279,8 @@ function run_python_test() {
     fi
     
     # اجرای تست‌های پایتون
-    log "--- Starting Python Tests ---"
-    predictive_test_status=1 # پیش‌فرض شکست
-    baseline_test_status=1   # پیش‌فرض شکست
+    log "--- Starting Python Tests ---"    predictive_test_status=1 # Default to failure
+    baseline_test_status=1   # Default to failure
 
     run_python_test "$PYTHON_SCRIPT_PREDICTIVE" "Predictive Strategy"
     predictive_test_status=$?
@@ -291,11 +290,11 @@ function run_python_test() {
     
     log "--- Python Tests Finished ---"
 
-    # پاکسازی نهایی
+    # Final cleanup
     log "Cleaning up: Stopping Hardhat node..."
     kill_hardhat_node
     
-    if type deactivate &> /dev/null && [[ -n "$VIRTUAL_ENV" ]]; then # فقط اگر در محیط مجازی هستیم
+    if type deactivate &> /dev/null && [[ -n "$VIRTUAL_ENV" ]]; then # Only if we're in a virtual environment
         log "Deactivating Python virtual environment..."
         deactivate
     fi
@@ -312,7 +311,7 @@ function run_python_test() {
     if [ $predictive_test_status -eq 0 ] && [ $baseline_test_status -eq 0 ]; then
         exit 0
     else
-        exit 1 # یا یک کد خطای ترکیبی اگر نیاز باشد
+        exit 1 # or use a combined error code if needed
     fi
 
 } # اتمام بلاک اصلی که خروجی‌اش به tee هدایت می‌شود

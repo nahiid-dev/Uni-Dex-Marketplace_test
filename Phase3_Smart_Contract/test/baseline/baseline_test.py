@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# filepath: d:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\test\baseline\baseline_test.py
 import os
 import sys
 import json
@@ -31,7 +33,7 @@ except ImportError as e:
     sys.exit(1)
 
 # --- Constants ---
-# مقادیر مورد نیاز برای شارژ قرارداد، از مقادیر جدید استفاده شده
+# Required values for contract funding, using new values
 MIN_WETH_TO_FUND_CONTRACT = Web3.to_wei(1, 'ether')
 MIN_USDC_TO_FUND_CONTRACT = 1000 * (10**6) # 1000 USDC
 TWO_POW_96 = Decimal(2**96)
@@ -63,15 +65,52 @@ logger.info(f"Baseline Results File: {RESULTS_FILE}")
 class BaselineTest(LiquidityTestBase):
     """Test implementation for BaselineMinimal with token funding."""
 
+    def _reset_metrics(self):
+        """Initialize or reset all metrics to their default values."""
+        return {
+            'timestamp': None,
+            'contract_type': 'Baseline',
+            'action_taken': "init",  # Using string directly since ACTION_STATES isn't set yet
+            'tx_hash': None,
+            'range_width_multiplier_setting': None,
+            'external_api_eth_price': None,
+            'actualPrice_pool': None,
+            'sqrtPriceX96_pool': None,
+            'currentTick_pool': None,
+            'targetTickLower_offchain': None,
+            'targetTickUpper_offchain': None,
+            'initial_contract_balance_token0': None,
+            'initial_contract_balance_token1': None,
+            'currentTickLower_contract': None,
+            'currentTickUpper_contract': None,
+            'currentLiquidity_contract': None,
+            'finalTickLower_contract': None,
+            'finalTickUpper_contract': None,
+            'finalLiquidity_contract': None,
+            'amount0_provided_to_mint': None,
+            'amount1_provided_to_mint': None,
+            'fees_collected_token0': None,
+            'fees_collected_token1': None,
+            'gas_used': None,
+            'gas_cost_eth': None,
+            'error_message': ""
+        }
+
     def __init__(self, contract_address: str):
-        super().__init__(contract_address, "BaselineMinimal")
-        self.ACTION_STATES = { # مطابق نسخه قدیمی
-            "INIT": "init", "SETUP_FAILED": "setup_failed",
-            "POOL_READ_FAILED": "pool_read_failed", "CALCULATION_FAILED": "calculation_failed",
-            "SKIPPED_PROXIMITY": "skipped_proximity", "FUNDING_FAILED": "funding_failed",
-            "TX_SENT": "tx_sent", "TX_SUCCESS_ADJUSTED": "tx_success_adjusted",
-            "TX_SUCCESS_SKIPPED_ONCHAIN": "tx_success_skipped_onchain", # اگر قرارداد خودش تشخیص دهد که نیاز به تغییر نیست
-            "TX_REVERTED": "tx_reverted", "TX_WAIT_FAILED": "tx_wait_failed",
+        """Initialize the BaselineTest instance."""
+        super().__init__(contract_address, "BaselineMinimal")      
+        self.ACTION_STATES = {
+            "INIT": "init",
+            "SETUP_FAILED": "setup_failed",
+            "POOL_READ_FAILED": "pool_read_failed",
+            "CALCULATION_FAILED": "calculation_failed",
+            "SKIPPED_PROXIMITY": "skipped_proximity",
+            "FUNDING_FAILED": "funding_failed",
+            "TX_SENT": "tx_sent",
+            "TX_SUCCESS_ADJUSTED": "tx_success_adjusted",
+            "TX_SUCCESS_SKIPPED_ONCHAIN": "tx_success_skipped_onchain",
+            "TX_REVERTED": "tx_reverted",
+            "TX_WAIT_FAILED": "tx_wait_failed",
             "METRICS_UPDATE_FAILED": "metrics_update_failed",
             "UNEXPECTED_ERROR": "unexpected_error"
         }
@@ -79,35 +118,13 @@ class BaselineTest(LiquidityTestBase):
         self.tick_spacing = None
         self.pool_address = None
         self.pool_contract = None
-        self.metrics = self._reset_metrics()
-        # Token contracts for estimation - در صورت نیاز در متدها مقداردهی می‌شوند
-        self.token0_contract_instance = None # تغییر نام برای جلوگیری از تداخل با self.token0 (آدرس)
+        self.token0_contract_instance = None
         self.token1_contract_instance = None
-
-    def _reset_metrics(self): # مطابق نسخه جدید فایل شما
-        return {
-            'timestamp': None, 'contract_type': 'Baseline',
-            'action_taken': self.ACTION_STATES["INIT"], 'tx_hash': None,
-            'range_width_multiplier_setting': None, # اضافه شده در نسخه جدید
-            'external_api_eth_price': None, # اضافه شده در نسخه جدید (برای baseline شاید نیاز نباشد ولی برای یکسان سازی ستون‌ها خوب است)
-            'actualPrice_pool': None, 'sqrtPriceX96_pool': None, 'currentTick_pool': None,
-            'targetTickLower_offchain': None, 'targetTickUpper_offchain': None,
-            'initial_contract_balance_token0': None, # اضافه شده در نسخه جدید
-            'initial_contract_balance_token1': None, # اضافه شده در نسخه جدید
-            'currentTickLower_contract': None, 'currentTickUpper_contract': None, 'currentLiquidity_contract': None,
-            'finalTickLower_contract': None, 'finalTickUpper_contract': None, 'finalLiquidity_contract': None,
-            'amount0_provided_to_mint': None, # اضافه شده در نسخه جدید
-            'amount1_provided_to_mint': None, # اضافه شده در نسخه جدید
-            'fees_collected_token0': None, # اضافه شده در نسخه جدید
-            'fees_collected_token1': None, # اضافه شده در نسخه جدید
-            'gas_used': None, 'gas_cost_eth': None, 'error_message': ""
-        }
-
-    # ---- متدهای بازگردانده شده از نسخه قدیمی ----
-    def _estimate_liquidity(self, tick_lower: int, tick_upper: int) -> int: # مطابق نسخه قدیمی [202-206]
+        self.metrics = self._reset_metrics()
+    def _estimate_liquidity(self, tick_lower: int, tick_upper: int) -> int: # According to old version [202-206]
         """Estimate liquidity based on token balances and tick range (simple approximation)."""
-        # این متد یک تخمین ساده است و نباید به عنوان منبع دقیق نقدینگی استفاده شود.
-        # قرارداد باید خودش نقدینگی را مدیریت و گزارش کند.
+        # This method is a simple estimate and should not be used as an accurate source of liquidity.
+        # The contract itself should manage and report liquidity.
         try:
             if not self.token0_contract_instance and self.token0:
                 self.token0_contract_instance = get_contract(self.token0, "IERC20")
@@ -123,54 +140,51 @@ class BaselineTest(LiquidityTestBase):
             
             slot0 = self.pool_contract.functions.slot0().call()
             current_tick = slot0[1]
-            
-            # منطق تخمین ساده (ممکن است دقیق نباشد)
-            if current_tick < tick_lower: # قیمت زیر محدوده، همه نقدینگی باید توکن0 باشد
-                # این تخمین برای نقدینگی Uniswap V3 بسیار ساده‌انگارانه است.
-                # نقدینگی واقعی به محاسبات پیچیده‌تری بستگی دارد.
-                return int(token0_bal) # این صحیح نیست، نقدینگی واحد متفاوتی دارد.
-            elif current_tick >= tick_upper: # قیمت بالای محدوده، همه نقدینگی باید توکن1 باشد
-                return int(token1_bal) # این هم صحیح نیست.
-            else: # قیمت داخل محدوده
-                 # این فقط یک میانگین ساده از بالانس‌هاست و نقدینگی واقعی نیست.
+              # Simple estimation logic (may not be accurate)
+            if current_tick < tick_lower: # Price below range, all liquidity should be token0
+                # This estimation is very simplistic for Uniswap V3 liquidity.
+                # Actual liquidity depends on more complex calculations.
+                return int(token0_bal) # This is not correct, liquidity has a different unit.
+            elif current_tick >= tick_upper: # Price above range, all liquidity should be token1
+                return int(token1_bal) # This is also not correct.
+            else: # Price within range
+                 # This is just a simple average of balances and not real liquidity.
                 return int((token0_bal + token1_bal) / 2)
         except Exception as e:
             logger.error(f"Error estimating liquidity: {e}")
             return 0
 
-    def get_position_info(self) -> dict | None: # مطابق نسخه قدیمی [198-202]
+    def get_position_info(self) -> dict | None: # According to old version [198-202]
         """Get current position details from the contract."""
         try:
-            # getCurrentPosition باید در قرارداد BaselineMinimal.sol تعریف شده باشد
-            # و اطلاعاتی مانند (tokenId, active, tickLower, tickUpper, liquidity) را برگرداند
-            # یا اگر از NonfungiblePositionManager استفاده می‌کنید، بایدtokenId را داشته باشید
-            # و از positions(tokenId) در NPM بخوانید.
-            # فرض می‌کنیم getCurrentPosition در قرارداد شما وجود دارد.
+            # getCurrentPosition must be defined in BaselineMinimal.sol
+            # and return information like (tokenId, active, tickLower, tickUpper, liquidity)
+            # or if you're using NonfungiblePositionManager, you should have tokenId
+            # and read from positions(tokenId) in NPM.
+            # We assume getCurrentPosition exists in your contract.
             position_data = self.contract.functions.getCurrentPosition().call()
             
-            # مثال: اگر getCurrentPosition یک تاپل برمی‌گرداند:
-            # token_id, active, tick_lower, tick_upper, liquidity_contract = position_data
-            # یا اگر دیکشنری برمی‌گرداند:
+            # Example: If getCurrentPosition returns a tuple:
+            # token_id, active, tick_lower, tick_upper, liquidity_contract = position_data            # Or if it returns a dictionary:
             # active = position_data.get('active')
             # tick_lower = position_data.get('tickLower')
             # ...
-            
-            # این بخش باید با ساختار خروجی getCurrentPosition شما تطبیق داده شود
-            # فرض بر این است که خروجی یک لیست/تاپل با ترتیب مشخص است:
+              # This section must be adapted to match your getCurrentPosition output structure
+            # Assuming the output is a list/tuple with a specific order:
             if len(position_data) >= 5:
                 token_id, active, tick_lower, tick_upper, liquidity_contract = position_data[0], position_data[1], position_data[2], position_data[3], position_data[4]
                 
-                # اگر قرارداد نقدینگی صفر برگرداند ولی پوزیشن فعال است، سعی در تخمین نکنید
-                # مگر اینکه مکانیزم قابل اعتمادی برای آن داشته باشید. مقدار خود قرارداد ارجح است.
+                # If contract returns 0 liquidity but position is active, don't attempt estimation
+                # unless you have a reliable mechanism for it. The contract's value is preferred.
                 # if active and liquidity_contract == 0:
                 # logger.warning("Contract reports active position with 0 liquidity. Using reported 0.")
                 
                 return {
-                    'tokenId': token_id, # اگر tokenId توسط قرارداد برگردانده می‌شود
+                    'tokenId': token_id, 
                     'active': active,
                     'tickLower': tick_lower,
                     'tickUpper': tick_upper,
-                    'liquidity': liquidity_contract # استفاده از نقدینگی گزارش شده توسط قرارداد
+                    'liquidity': liquidity_contract
                 }
             else:
                 logger.error(f"Unexpected data structure from getCurrentPosition(): {position_data}")
@@ -180,7 +194,7 @@ class BaselineTest(LiquidityTestBase):
             self.metrics['error_message'] += f";PosInfoError: {str(e)}"
             return None
             
-    def setup(self, desired_range_width_multiplier: int) -> bool: # پارامتر اضافه شده مطابق نسخه جدید
+    def setup(self, desired_range_width_multiplier: int) -> bool: # Parameter added according to new version
         if not super().setup(desired_range_width_multiplier):
             self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
             self.metrics['error_message'] = "Base setup failed"
@@ -210,14 +224,12 @@ class BaselineTest(LiquidityTestBase):
             logger.info(f"Baseline Pool contract initialized at {self.pool_address}")
             
             self.tick_spacing = self.pool_contract.functions.tickSpacing().call()
-            if not self.tick_spacing or self.tick_spacing <= 0: # tickSpacing باید مثبت باشد
+            if not self.tick_spacing or self.tick_spacing <= 0: # tickSpacing must be positive
                 logger.error(f"Invalid tickSpacing read from pool: {self.tick_spacing}")
                 self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
                 self.metrics['error_message'] = f"Invalid tickSpacing: {self.tick_spacing}"
                 return False
-            logger.info(f"Baseline Tick spacing from pool: {self.tick_spacing}")
-
-            # تنظیم rangeWidthMultiplier مطابق نسخه جدید
+            logger.info(f"Baseline Tick spacing from pool: {self.tick_spacing}")            # Set rangeWidthMultiplier according to new version
             logger.info(f"Setting rangeWidthMultiplier to {desired_range_width_multiplier} for Baseline contract...")
             self.metrics['range_width_multiplier_setting'] = desired_range_width_multiplier
             
@@ -252,18 +264,18 @@ class BaselineTest(LiquidityTestBase):
             logger.info(f"rangeWidthMultiplier set successfully for Baseline contract. TxHash: {receipt_rwm.transactionHash.hex()}")
             return True
         except Exception as e:
-            logger.exception(f"Baseline setup failed: {e}") # تغییر پیام لاگ
+            logger.exception(f"Baseline setup failed: {e}") # Changed log message
             self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
-            self.metrics['error_message'] = f"Setup error: {str(e)}" # تغییر پیام لاگ
+            self.metrics['error_message'] = f"Setup error: {str(e)}" # Changed log message
             return False
 
-    def get_pool_state(self) -> tuple[int | None, int | None]: # مطابق نسخه قدیمی [213-215]
+    def get_pool_state(self) -> tuple[int | None, int | None]:
         if not self.pool_contract:
             logger.error("Pool contract not initialized for get_pool_state (Baseline).")
             self.metrics['action_taken'] = self.ACTION_STATES["POOL_READ_FAILED"]
             self.metrics['error_message'] = "Pool contract missing for get_pool_state"
             return None, None
-        if not web3_utils.w3 or not web3_utils.w3.is_connected(): # بررسی اتصال web3
+        if not web3_utils.w3 or not web3_utils.w3.is_connected(): # Check web3 connection
             logger.error("Web3 not connected in get_pool_state (Baseline).")
             self.metrics['action_taken'] = self.ACTION_STATES["POOL_READ_FAILED"]
             self.metrics['error_message'] = "W3 not connected for get_pool_state"
@@ -271,11 +283,10 @@ class BaselineTest(LiquidityTestBase):
         try:
             slot0 = self.pool_contract.functions.slot0().call()
             sqrt_price_x96, tick = slot0[0], slot0[1]
-            
-            # به‌روزرسانی متریک‌ها در اینجا
+              # Update metrics here
             self.metrics['sqrtPriceX96_pool'] = sqrt_price_x96
             self.metrics['currentTick_pool'] = tick
-            # _calculate_actual_price باید در LiquidityTestBase تعریف شده باشد
+            # _calculate_actual_price must be defined in LiquidityTestBase
             self.metrics['actualPrice_pool'] = self._calculate_actual_price(sqrt_price_x96) 
             
             logger.info(f"Pool state read: Tick={tick}, SqrtPriceX96={sqrt_price_x96}, ActualPrice={self.metrics['actualPrice_pool']:.4f}")
@@ -286,80 +297,84 @@ class BaselineTest(LiquidityTestBase):
             self.metrics['error_message'] = f"Pool state read error: {str(e)}"
             return None, None
     
-    def calculate_target_ticks_offchain(self, current_tick: int) -> tuple[int | None, int | None]: # مطابق نسخه قدیمی [216-222]
+    def calculate_target_ticks_offchain(self, current_tick: int) -> tuple[int | None, int | None]:
+        """
+        Calculate target tick range centered around current_tick.
+        For WETH/USDC pool where USDC is token0 and WETH is token1:
+        - When ETH price is high (e.g. $2000), current_tick will be negative
+        - rangeWidthMultiplier * tickSpacing determines total width of range
+        - Range should be approximately +/-5% in price terms
+        """
         if self.tick_spacing is None or current_tick is None:
             logger.error("Tick spacing or current_tick not available for target tick calculation (Baseline).")
             self.metrics['action_taken'] = self.ACTION_STATES["CALCULATION_FAILED"]
             self.metrics['error_message'] = "Missing data for target tick calc (Baseline)"
             return None, None
         try:
-            # خواندن rangeWidthMultiplier از قرارداد، زیرا ممکن است پس از setup تغییر کرده باشد
-            # یا از مقداری که در setup استفاده شده و در self.metrics ذخیره شده، استفاده کنید
+            # Get the width multiplier from contract or metrics
             width_multiplier = self.metrics.get('range_width_multiplier_setting')
-            if width_multiplier is None: # اگر در متریک‌ها نبود (مثلاً قبل از setup کامل)
-                 width_multiplier = self.contract.functions.rangeWidthMultiplier().call() # خواندن مستقیم
-
-            if width_multiplier is None or width_multiplier <=0: # بررسی مقدار معتبر
+            if width_multiplier is None or width_multiplier <= 0:
+                width_multiplier = self.contract.functions.rangeWidthMultiplier().call()
+            
+            if width_multiplier is None or width_multiplier <= 0:
                 logger.error(f"Invalid rangeWidthMultiplier ({width_multiplier}) for tick calculation.")
                 self.metrics['action_taken'] = self.ACTION_STATES["CALCULATION_FAILED"]
                 self.metrics['error_message'] = f"Invalid RWM ({width_multiplier}) for tick calc"
                 return None, None
 
-            # محاسبه halfWidth بر اساس مستندات Uniswap V3 و قرارداد شما
-            # در قرارداد BaselineMinimal.sol شما (منبع [18] فایل test_new.docx):
-            # int24 halfWidth = (tickSpacing * int24(rangeWidthMultiplier)) / 2;
-            # این یعنی کل عرض برابر است با tickSpacing * rangeWidthMultiplier
-            half_total_tick_width = (self.tick_spacing * width_multiplier) // 2 # تقسیم صحیح
-            
-            # اطمینان از اینکه half_total_tick_width حداقل برابر با tickSpacing است اگر multiplier خیلی کوچک باشد
-            if half_total_tick_width < self.tick_spacing // 2 : # یا هر حداقل دیگری که منطقی باشد
-                 half_total_tick_width = self.tick_spacing // 2 # حداقل باید یک تیک فاصله داشته باشد
+            # Calculate half width to achieve approximately ±5% range
+            # For 5% range: log_1.0001(1.05) ≈ 487 ticks
+            target_half_tick_width = 487
 
-            # گرد کردن تیک‌ها به نزدیک‌ترین مضرب tickSpacing
-            target_lower_tick = math.floor((current_tick - half_total_tick_width) / self.tick_spacing) * self.tick_spacing
-            target_upper_tick = math.ceil((current_tick + half_total_tick_width) / self.tick_spacing) * self.tick_spacing # استفاده از ceil برای بالایی
+            # Scale the width by the multiplier and ensure it's a multiple of tick_spacing
+            scaled_half_width = (target_half_tick_width * width_multiplier) // 100
+            tick_spacing_multiple = math.ceil(scaled_half_width / self.tick_spacing)
+            half_total_tick_width = tick_spacing_multiple * self.tick_spacing
 
-            # بررسی و اصلاح محدوده اگر نامعتبر باشد
-            if target_lower_tick >= target_upper_tick:
-                # اگر تیک پایین بزرگتر یا مساوی تیک بالا شد، سعی کنید تیک بالا را افزایش دهید
-                target_upper_tick = target_lower_tick + self.tick_spacing
-            
-            # اطمینان از اینکه تیک‌ها در محدوده مجاز Uniswap V3 هستند
+            # Ensure minimum width of one tick spacing
+            if half_total_tick_width < self.tick_spacing:
+                logger.warning(f"Calculated half width {half_total_tick_width} is less than tick spacing {self.tick_spacing}. Using minimum width.")
+                half_total_tick_width = self.tick_spacing
+
+            # Calculate target ticks ensuring they align with tick spacing
+            target_lower_tick = math.floor(current_tick / self.tick_spacing) * self.tick_spacing - half_total_tick_width
+            target_upper_tick = math.ceil(current_tick / self.tick_spacing) * self.tick_spacing + half_total_tick_width
+
+            # Ensure ticks are within valid range
             target_lower_tick = max(MIN_TICK_CONST, target_lower_tick)
             target_upper_tick = min(MAX_TICK_CONST, target_upper_tick)
 
-            # بررسی نهایی برای اطمینان از اینکه lower < upper
+            # Ensure lower < upper
             if target_lower_tick >= target_upper_tick:
-                if target_upper_tick == MAX_TICK_CONST: # اگر تیک بالا در ماکزیمم است، تیک پایین را کم کن
-                    target_lower_tick = target_upper_tick - self.tick_spacing
-                else: # در غیر این صورت، تیک بالا را افزایش بده
-                    target_upper_tick = target_lower_tick + self.tick_spacing
-            
-            # یک بار دیگر محدوده‌ها را بررسی کن
-            target_lower_tick = max(MIN_TICK_CONST, target_lower_tick)
-            target_upper_tick = min(MAX_TICK_CONST, target_upper_tick)
-
-            if target_lower_tick >= target_upper_tick: # اگر هنوز مشکل وجود دارد
-                logger.error(f"FATAL: Invalid tick range after all adjustments: L={target_lower_tick}, U={target_upper_tick} with spacing={self.tick_spacing}, multiplier={width_multiplier}, current_tick={current_tick}")
+                logger.error(f"Invalid tick range calculated: [{target_lower_tick}, {target_upper_tick}]")
                 self.metrics['action_taken'] = self.ACTION_STATES["CALCULATION_FAILED"]
                 self.metrics['error_message'] = "Generated invalid tick range L >= U"
                 return None, None
 
-            logger.info(f"Off-chain calculated target ticks (Baseline): Lower={target_lower_tick}, Upper={target_upper_tick} (CurrentPoolTick: {current_tick}, TickSpacing: {self.tick_spacing}, RWM: {width_multiplier})")
+            logger.info("Target ticks calculation details:")
+            logger.info(f"  Current tick: {current_tick}")
+            logger.info(f"  Range width multiplier: {width_multiplier}")
+            logger.info(f"  Tick spacing: {self.tick_spacing}")
+            logger.info(f"  Half width in ticks: {half_total_tick_width}")
+            logger.info(f"  Target range: [{target_lower_tick}, {target_upper_tick}]")
+
+            # Update metrics and return
             self.metrics['targetTickLower_offchain'] = target_lower_tick
             self.metrics['targetTickUpper_offchain'] = target_upper_tick
             return target_lower_tick, target_upper_tick
+            
         except Exception as e:
             logger.exception(f"Error calculating target ticks off-chain (Baseline): {e}")
             self.metrics['action_taken'] = self.ACTION_STATES["CALCULATION_FAILED"]
             self.metrics['error_message'] = f"Target tick calc error (Baseline): {str(e)}"
-            return None, None
-    # ---- پایان متدهای بازگردانده شده ----
+            return None, None    # ---- End of restored methods ----
 
-    def adjust_position(self, target_weth_balance: float, target_usdc_balance: float) -> bool: # پارامترها مطابق نسخه جدید
-        self.metrics = self._reset_metrics() # ریست کردن متریک‌ها
+    def adjust_position(self, target_weth_balance: float, target_usdc_balance: float) -> bool: # Parameters according to new version        self.metrics = self._reset_metrics() # Reset metrics
         try:
-            # خواندن range_width_multiplier فعلی از قرارداد
+            # Get current ETH price from API
+            self.get_current_eth_price()
+            
+            # Read current range_width_multiplier from contract
             current_rwm = self.contract.functions.rangeWidthMultiplier().call()
             self.metrics['range_width_multiplier_setting'] = current_rwm
         except Exception:
@@ -376,37 +391,32 @@ class BaselineTest(LiquidityTestBase):
         
         funding_account = Account.from_key(private_key_env)
 
-        try:
-            # 1. دریافت وضعیت فعلی استخر
-            _, current_tick = self.get_pool_state() # فراخوانی متد بازگردانده شده
+        try:            # 1. Get current pool state
+            _, current_tick = self.get_pool_state() # Call restored method
             if current_tick is None:
-                # self.metrics قبلاً در get_pool_state به‌روز شده
+                # self.metrics already updated in get_pool_state
                 self.save_metrics()
-                return False
-
-            # 2. دریافت اطلاعات پوزیشن فعلی از قرارداد
-            pos_info_before = self.get_position_info() # فراخوانی متد بازگردانده شده
+                return False            # 2. Get current position information from contract
+            pos_info_before = self.get_position_info() # Call restored method
             current_pos_active = False
             if pos_info_before:
                 current_pos_active = pos_info_before.get('active', False)
                 self.metrics['currentTickLower_contract'] = pos_info_before.get('tickLower')
                 self.metrics['currentTickUpper_contract'] = pos_info_before.get('tickUpper')
                 self.metrics['currentLiquidity_contract'] = pos_info_before.get('liquidity', 0)
-            else: # اگر اطلاعات پوزیشن قابل خواندن نبود
-                logger.warning("Could not get current position info for Baseline. Assuming no active position.")
-
-            # 3. محاسبه تیک‌های هدف به صورت آفچین
-            target_lower_tick, target_upper_tick = self.calculate_target_ticks_offchain(current_tick) # فراخوانی متد
+            else: # If position information could not be read
+                logger.warning("Could not get current position info for Baseline. Assuming no active position.")            # 3. Calculate target ticks off-chain
+            target_lower_tick, target_upper_tick = self.calculate_target_ticks_offchain(current_tick) # Call method
             if target_lower_tick is None or target_upper_tick is None:
                 self.save_metrics()
                 return False
             
-            # 4. بررسی نزدیکی (Proximity Check) - (منطق از نسخه قدیمی)
+            # 4. Proximity check - (Logic from old version)
             if current_pos_active and \
                self.metrics['currentTickLower_contract'] is not None and \
                self.metrics['currentTickUpper_contract'] is not None and \
                self.tick_spacing is not None:
-                # تعریف یک آستانه برای نزدیکی، مثلاً خود tickSpacing
+                # Define a threshold for proximity, e.g., the tickSpacing itself
                 TICK_PROXIMITY_THRESHOLD = self.tick_spacing 
                 
                 is_lower_close = abs(target_lower_tick - self.metrics['currentTickLower_contract']) <= TICK_PROXIMITY_THRESHOLD
@@ -414,15 +424,13 @@ class BaselineTest(LiquidityTestBase):
 
                 if is_lower_close and is_upper_close:
                     logger.info(f"Baseline Off-chain proximity check: Target ticks ({target_lower_tick}, {target_upper_tick}) are close to current on-chain ({self.metrics['currentTickLower_contract']}, {self.metrics['currentTickUpper_contract']}). Skipping adjustment call.")
-                    self.metrics['action_taken'] = self.ACTION_STATES["SKIPPED_PROXIMITY"]
-                    # مقادیر نهایی را با مقادیر فعلی پر کن چون تغییری رخ نداده
+                    self.metrics['action_taken'] = self.ACTION_STATES["SKIPPED_PROXIMITY"]                    # Fill final values with current values since no change occurred
                     self.metrics['finalTickLower_contract'] = self.metrics['currentTickLower_contract']
                     self.metrics['finalTickUpper_contract'] = self.metrics['currentTickUpper_contract']
                     self.metrics['finalLiquidity_contract'] = self.metrics['currentLiquidity_contract']
                     self.save_metrics()
-                    return True # عملیات موفقیت آمیز بوده (چون نیازی به تغییر نبوده)
-            
-            # 5. شارژ دقیق قرارداد (مطابق نسخه جدید)
+                    return True # Operation was successful (because no change was needed)
+              # 5. Precise contract funding (according to new version)
             logger.info("Ensuring precise token balances for Baseline contract...")
             if not contract_funder.ensure_precise_token_balances(
                 contract_address=self.contract_address,
@@ -436,15 +444,12 @@ class BaselineTest(LiquidityTestBase):
             ):
                 logger.error("Precise funding for Baseline contract failed.")
                 self.metrics['action_taken'] = self.ACTION_STATES["FUNDING_FAILED"]
-                self.metrics['error_message'] = "Precise contract funding failed (Baseline)"
-                # مقادیر نهایی را با مقادیر فعلی (قبل از شارژ ناموفق) پر کن
+                self.metrics['error_message'] = "Precise contract funding failed (Baseline)"                # Fill final values with current values (before failed funding)
                 self.metrics['finalTickLower_contract'] = self.metrics['currentTickLower_contract']
                 self.metrics['finalTickUpper_contract'] = self.metrics['currentTickUpper_contract']
                 self.metrics['finalLiquidity_contract'] = self.metrics['currentLiquidity_contract']
                 self.save_metrics()
-                return False
-
-            # 6. خواندن موجودی اولیه قرارداد (بعد از شارژ و قبل از تراکنش اصلی)
+                return False            # 6. Read initial contract balance (after funding and before main transaction)
             try:
                 token0_c = get_contract(self.token0, "IERC20")
                 token1_c = get_contract(self.token1, "IERC20")
@@ -454,7 +459,8 @@ class BaselineTest(LiquidityTestBase):
             except Exception as bal_err:
                 logger.warning(f"Could not read initial contract balances for baseline metrics: {bal_err}")
 
-            # 7. فراخوانی تابع adjustLiquidityWithCurrentPrice در قرارداد هوشمند
+            # 7. Call the adjustLiquidityWithCurrentPrice function in the smart contract
+
             logger.info(f"Calling adjustLiquidityWithCurrentPrice for Baseline contract...")
             
             tx_function_call_base = self.contract.functions.adjustLiquidityWithCurrentPrice()
@@ -462,9 +468,8 @@ class BaselineTest(LiquidityTestBase):
                 'from': funding_account.address,
                 'nonce': web3_utils.w3.eth.get_transaction_count(funding_account.address),
                 'chainId': int(web3_utils.w3.net.version)
-            }
-
-            try: # تخمین گاز
+            }           
+            try: # Gas estimation
                 gas_estimate_base = tx_function_call_base.estimate_gas({'from': funding_account.address})
                 tx_params_base['gas'] = int(gas_estimate_base * 1.25)
                 logger.info(f"Estimated gas for 'adjustLiquidityWithCurrentPrice': {gas_estimate_base}, using: {tx_params_base['gas']}")
@@ -483,51 +488,45 @@ class BaselineTest(LiquidityTestBase):
                 self.metrics['gas_used'] = receipt_base.get('gasUsed', 0)
                 eff_gas_price_base = receipt_base.get('effectiveGasPrice', web3_utils.w3.eth.gas_price)
                 self.metrics['gas_cost_eth'] = float(Web3.from_wei(self.metrics['gas_used'] * eff_gas_price_base, 'ether'))
-                adjustment_call_success = True
-
-                # پردازش رویدادها برای Baseline
-                # BaselineMinimal.sol ممکن است رویدادهای متفاوتی داشته باشد.
-                # فرض می‌کنیم یک رویداد PositionMinted و PositionRemoved/FeesCollected دارد
+                adjustment_call_success = True                # Process events for Baseline
+                # BaselineMinimal.sol may have different events.
+                # We assume it has PositionMinted and PositionRemoved/FeesCollected events
                 try:
-                    # برای MINT (اگر adjustLiquidityWithCurrentPrice یک پوزیشن جدید ایجاد کند)
+                    # For MINT (if adjustLiquidityWithCurrentPrice creates a new position)
                     mint_logs_base = self.contract.events.PositionMinted().process_receipt(receipt_base, errors=logging.WARN)
                     for log_m_b in mint_logs_base:
                         self.metrics['amount0_provided_to_mint'] = log_m_b.args.amount0Actual
                         self.metrics['amount1_provided_to_mint'] = log_m_b.args.amount1Actual
-                        # مقادیر تیک و نقدینگی نهایی از این رویداد یا get_position_info خوانده می‌شود
+                        # Final tick and liquidity values are read from this event or get_position_info
                         self.metrics['finalTickLower_contract'] = log_m_b.args.tickLower
                         self.metrics['finalTickUpper_contract'] = log_m_b.args.tickUpper
                         self.metrics['finalLiquidity_contract'] = log_m_b.args.liquidity
-                        self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"] # اگر mint شد، یعنی adjust شده
-
-                    # برای REMOVE/COLLECT (اگر پوزیشن قبلی حذف و کارمزد جمع‌آوری شود)
-                    # نام رویداد را با قرارداد خود تطبیق دهید
+                        self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"] # If minted, it means position was adjusted                    # For REMOVE/COLLECT (if previous position is removed and fees are collected)
+                    # Match the event name with your contract
                     # remove_logs_base = self.contract.events.PositionRemovedAndFeesCollected().process_receipt(receipt_base, errors=logging.WARN)
                     # for log_r_b in remove_logs_base:
                     #     self.metrics['fees_collected_token0'] = log_r_b.args.fees0
                     #     self.metrics['fees_collected_token1'] = log_r_b.args.fees1
                     
-                    # اگر قرارداد یک رویداد کلی برای وضعیت تنظیم می‌کند مثل BaselineAdjustmentMetrics در نسخه قدیمی
-                    # این بخش از کد قدیمی [263-268] می‌تواند مفید باشد
-                    # event_name_base = "BaselineAdjustmentMetrics" # یا نام مشابه
+                    # If contract emits a general status event like BaselineAdjustmentMetrics in old version
+                    # This section of old code [263-268] might be useful
+                    # event_name_base = "BaselineAdjustmentMetrics" # or a similar name
                     # if hasattr(self.contract.events, event_name_base):
                     #     logs_adj_base = self.contract.events[event_name_base]().process_receipt(receipt_base, errors=logging.WARN)
                     #     if logs_adj_base and len(logs_adj_base) > 0:
-                    #         adjusted_onchain = logs_adj_base[0]['args'].get('adjusted', False) # فرض بر وجود فیلد adjusted
-                    #         self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"] if adjusted_onchain else self.ACTION_STATES["TX_SUCCESS_SKIPPED_ONCHAIN"]
-                    #         # مقادیر تیک و نقدینگی نهایی از رویداد
+                    #         adjusted_onchain = logs_adj_base[0]['args'].get('adjusted', False) # Assuming 'adjusted' field exists                    #         self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"] if adjusted_onchain else self.ACTION_STATES["TX_SUCCESS_SKIPPED_ONCHAIN"]
+                    #         # Final tick values and liquidity from event
                     #         self.metrics['finalTickLower_contract'] = logs_adj_base[0]['args'].get('finalTickLower', self.metrics['finalTickLower_contract'])
                     #         self.metrics['finalTickUpper_contract'] = logs_adj_base[0]['args'].get('finalTickUpper', self.metrics['finalTickUpper_contract'])
                     #         self.metrics['finalLiquidity_contract'] = logs_adj_base[0]['args'].get('finalLiquidity', self.metrics['finalLiquidity_contract'])
-                    #     else: # اگر رویداد پیدا نشد ولی تراکنش موفق بود
+                    #     else: # If event was not found but transaction was successful
                     #         self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"]
-                    # else: # اگر قرارداد این رویداد را ندارد
+                    # else: # If contract doesn't have this event
                     #     self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"]
 
                 except Exception as log_err_base:
                     logger.error(f"Error processing logs for baseline transaction: {log_err_base}")
-            
-            elif receipt_base: # تراکنش ناموفق (status 0)
+            elif receipt_base: # Failed transaction (status 0)
                 logger.error(f"Baseline adjustment transaction reverted (Status 0). Tx: {self.metrics['tx_hash']}")
                 self.metrics['action_taken'] = self.ACTION_STATES["TX_REVERTED"]
                 self.metrics['error_message'] = "tx_reverted_onchain (Baseline)"
@@ -535,7 +534,7 @@ class BaselineTest(LiquidityTestBase):
                 eff_gas_price_base = receipt_base.get('effectiveGasPrice', web3_utils.w3.eth.gas_price)
                 self.metrics['gas_cost_eth'] = float(Web3.from_wei(self.metrics['gas_used'] * eff_gas_price_base, 'ether'))
                 adjustment_call_success = False
-            else: # ارسال تراکنش ناموفق
+            else: # Transaction sending failed
                 logger.error("Baseline adjustment transaction sending/receipt failed.")
                 if self.metrics['action_taken'] == self.ACTION_STATES["TX_SENT"]:
                     self.metrics['action_taken'] = self.ACTION_STATES["TX_WAIT_FAILED"]
@@ -545,35 +544,32 @@ class BaselineTest(LiquidityTestBase):
         except Exception as tx_err_base:
             logger.exception(f"Error during baseline adjustment transaction call/wait: {tx_err_base}")
             self.metrics['action_taken'] = self.ACTION_STATES["UNEXPECTED_ERROR"]
-            self.metrics['error_message'] = f"TxError (Baseline): {str(tx_err_base)}"
-            # self.save_metrics() # در finally ذخیره می‌شود
+            self.metrics['error_message'] = f"TxError (Baseline): {str(tx_err_base)}"            # self.save_metrics() # Will be saved in finally block
             return False
         
-        finally: # اطمینان از اینکه متریک‌ها و اطلاعات پوزیشن نهایی همیشه ذخیره می‌شوند
-            # 8. به‌روزرسانی نهایی اطلاعات پوزیشن (بعد از تراکنش)
-            # اگر رویدادها شامل اطلاعات کامل پوزیشن نهایی نبودند، از get_position_info استفاده کن
+        finally: # Ensure metrics and final position info are always saved
+            # 8. Final update of position information (after transaction)
+            # If events didn't include complete final position info, use get_position_info
             final_pos_info = self.get_position_info()
-            if final_pos_info:
-                self.metrics['finalTickLower_contract'] = final_pos_info.get('tickLower', self.metrics['finalTickLower_contract']) # اگر از رویداد پر نشده بود
+            if final_pos_info:        
+                self.metrics['finalTickLower_contract'] = final_pos_info.get('tickLower', self.metrics['finalTickLower_contract']) # If not filled from event
                 self.metrics['finalTickUpper_contract'] = final_pos_info.get('tickUpper', self.metrics['finalTickUpper_contract'])
                 self.metrics['finalLiquidity_contract'] = final_pos_info.get('liquidity', self.metrics['finalLiquidity_contract'])
             else:
                 logger.warning("Baseline: Could not get final position info after tx. Metrics might be incomplete for final state.")
-                # اگر اطلاعات پوزیشن نهایی در دسترس نیست، حداقل تیک‌های هدف را به عنوان تیک نهایی در نظر بگیر
+                # If final position info is not available, at least use target ticks as final ticks
                 if self.metrics['finalTickLower_contract'] is None : self.metrics['finalTickLower_contract'] = target_lower_tick
                 if self.metrics['finalTickUpper_contract'] is None : self.metrics['finalTickUpper_contract'] = target_upper_tick
-                # نقدینگی ممکن است نامشخص باقی بماند
-            self.save_metrics()
-
-        return adjustment_call_success
-
-    def save_metrics(self): # مطابق نسخه جدید فایل شما
+                # Liquidity might remain unknown
+            self.save_metrics()           
+            return adjustment_call_success    
+    
+    def save_metrics(self): # According to your new file version
         self.metrics['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # ستون‌ها مطابق با _reset_metrics در نسخه جدید
+        # Columns match _reset_metrics in new version
         columns = [
-            'timestamp', 'contract_type', 'action_taken', 'tx_hash',
-            'range_width_multiplier_setting',
-            'external_api_eth_price', # این برای baseline معمولاً null است
+            'timestamp', 'contract_type', 'action_taken', 'tx_hash',            'range_width_multiplier_setting',
+            'external_api_eth_price', # This is usually null for baseline
             'actualPrice_pool', 'sqrtPriceX96_pool', 'currentTick_pool',
             'targetTickLower_offchain', 'targetTickUpper_offchain',
             'initial_contract_balance_token0',
@@ -601,7 +597,7 @@ class BaselineTest(LiquidityTestBase):
             logger.exception(f"Failed to save baseline metrics: {e}")
 
 # --- Main Function ---
-def main(): # مطابق نسخه جدید فایل شما
+def main(): # According to your new file version
     logger.info("="*50)
     logger.info("Starting Baseline Minimal Liquidity Manager Test on Fork")
     logger.info("="*50)
@@ -637,11 +633,10 @@ def main(): # مطابق نسخه جدید فایل شما
                 temp_test_b_error.metrics['error_message'] = f"Key 'address' not found in {ADDRESS_FILE_BASELINE}"
                 temp_test_b_error.save_metrics()
                 raise ValueError(f"Key 'address' not found in {ADDRESS_FILE_BASELINE}")
-        logger.info(f"Loaded Baseline Minimal Address: {baseline_address_val}")
-
-        test_baseline = BaselineTest(baseline_address_val) # تغییر نام متغیر
+        logger.info(f"Loaded Baseline Minimal Address: {baseline_address_val}")      
+        test_baseline = BaselineTest(baseline_address_val) # Variable name changed
         
-        # خواندن پارامترها از متغیرهای محیطی یا مقادیر پیش‌فرض
+        # Read parameters from environment variables or default values
         desired_rwm_base = int(os.getenv('BASELINE_RWM', '50'))
         target_weth_base = float(os.getenv('BASELINE_TARGET_WETH', '1.0'))
         target_usdc_base = float(os.getenv('BASELINE_TARGET_USDC', '2000.0'))

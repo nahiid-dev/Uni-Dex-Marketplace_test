@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# filepath: d:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\test\utils\test_base.py
 import os
 import logging
 from abc import ABC, abstractmethod
@@ -22,7 +24,38 @@ class LiquidityTestBase(ABC):
         self.token1 = None
         self.token0_decimals = None
         self.token1_decimals = None
-        # self.w3 will now be web3_utils.w3
+        self.metrics = self._reset_metrics()
+
+    def _reset_metrics(self):
+        """Initialize or reset all metrics to their default values. Override in derived classes."""
+        return {
+            'timestamp': None,
+            'contract_type': None,
+            'action_taken': None,
+            'tx_hash': None,
+            'range_width_multiplier_setting': None,
+            'external_api_eth_price': None,
+            'actualPrice_pool': None,
+            'sqrtPriceX96_pool': None,
+            'currentTick_pool': None,
+            'targetTickLower_offchain': None,
+            'targetTickUpper_offchain': None,
+            'initial_contract_balance_token0': None,
+            'initial_contract_balance_token1': None,
+            'currentTickLower_contract': None,
+            'currentTickUpper_contract': None,
+            'currentLiquidity_contract': None,
+            'finalTickLower_contract': None,
+            'finalTickUpper_contract': None,
+            'finalLiquidity_contract': None,
+            'amount0_provided_to_mint': None,
+            'amount1_provided_to_mint': None,
+            'fees_collected_token0': None,
+            'fees_collected_token1': None,
+            'gas_used': None,
+            'gas_cost_eth': None,
+            'error_message': ""
+        }
 
     def setup(self, desired_range_width_multiplier: int) -> bool:
         """Initialize connection and contracts."""
@@ -176,7 +209,10 @@ class LiquidityTestBase(ABC):
     def _calculate_actual_price(self, sqrt_price_x96: int) -> float:
         """
         Calculates the human-readable price from a sqrtPriceX96 value.
-        Assumes T1/T0 price (e.g., WETH/USDC if Token1 is WETH and Token0 is USDC).
+        For WETH/USDC pool where USDC is token0 and WETH is token1:
+        - sqrtPriceX96 represents √(price) * 2^96
+        - price here means how many token0 (USDC) for one token1 (WETH)
+        - Example: If ETH = $2000 USDC, then price should be 2000
         """
         if not sqrt_price_x96 or sqrt_price_x96 == 0:
             return 0.0
@@ -186,10 +222,62 @@ class LiquidityTestBase(ABC):
 
         TWO_POW_96 = Decimal(2**96)
         try:
+            # Convert sqrtPriceX96 to Decimal for precise calculation
             sqrt_price_x96_dec = Decimal(sqrt_price_x96)
-            price_ratio_token1_token0 = (sqrt_price_x96_dec / TWO_POW_96)**2
-            adjusted_price = price_ratio_token1_token0 * (Decimal(10)**(self.token1_decimals - self.token0_decimals))
-            return float(adjusted_price)
+            
+            # Calculate the square of sqrt_price
+            # This gives price = token1/token0 in terms of raw amounts
+            price_raw = (sqrt_price_x96_dec / TWO_POW_96) ** 2
+            
+            # Adjust for decimals to get the actual price
+            # For USDC (6 decimals) and WETH (18 decimals):
+            # price_adjusted = price_raw * 10^(decimals_token0 - decimals_token1)
+            decimal_adjustment = Decimal(10) ** (self.token0_decimals - self.token1_decimals)
+            actual_price = price_raw * decimal_adjustment
+
+            logger.debug("Price calculation details:")
+            logger.debug(f"  sqrtPriceX96: {sqrt_price_x96}")
+            logger.debug(f"  raw price (token1/token0): {float(price_raw)}")
+            logger.debug(f"  decimal adjustment (10^({self.token0_decimals}-{self.token1_decimals})): {float(decimal_adjustment)}")
+            logger.debug(f"  final price (token0/token1): {float(actual_price)}")
+            
+            return float(actual_price)
         except Exception as e:
             logger.exception(f"Error calculating actual price from sqrtPriceX96={sqrt_price_x96}: {e}")
             return 0.0
+
+    def get_current_eth_price(self) -> float | None:
+        """
+        Fetches current ETH price in USD from CoinGecko API.
+        Returns None if request fails.
+        """
+        try:
+            import requests
+            from time import sleep
+
+            # CoinGecko API endpoint for ETH/USD price
+            url = "https://api.coingecko.com/api/v3/simple/price"
+            params = {
+                "ids": "ethereum",
+                "vs_currencies": "usd"
+            }
+            
+            # Add rate limiting delay to respect API limits
+            sleep(1)
+            
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                price_data = response.json()
+                eth_price = price_data.get('ethereum', {}).get('usd')
+                if eth_price:
+                    logger.info(f"Current ETH price from CoinGecko: ${eth_price:,.2f}")
+                    # Update metrics with external price
+                    self.metrics['external_api_eth_price'] = float(eth_price)
+                    return float(eth_price)
+            
+            logger.error(f"Failed to get ETH price. Status code: {response.status_code}")
+            return None
+            
+        except Exception as e:
+            logger.exception(f"Error fetching ETH price from CoinGecko: {e}")
+            return None

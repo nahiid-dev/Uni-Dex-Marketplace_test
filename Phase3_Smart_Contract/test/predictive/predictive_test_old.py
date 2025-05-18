@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-# filepath: d:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\test\predictive\predictive_test.py
 import os
 import sys
 import json
@@ -24,19 +22,19 @@ import test.utils.web3_utils as web3_utils
 import test.utils.contract_funder as contract_funder
 
 # Precision for Decimal calculations
-getcontext().prec = 78 # Decimal calculation precision
+getcontext().prec = 78 # دقت محاسبات Decimal
 
 try:
     from test.utils.test_base import LiquidityTestBase
-    from test.utils.web3_utils import send_transaction, get_contract # Ensure get_contract is imported
+    from test.utils.web3_utils import send_transaction, get_contract # اطمینان از وارد کردن get_contract
 except ImportError as e:
     print(f"ERROR importing from test.utils in predictive_test.py: {e}. Check sys.path and __init__.py files.", file=sys.stderr)
     sys.exit(1)
 
 # --- Constants ---
-# Required values for contract funding
-MIN_WETH_TO_FUND_CONTRACT = Web3.to_wei(1, 'ether')  
-MIN_USDC_TO_FUND_CONTRACT = 1000 * (10**6)  # 1000 USDC
+# مقادیر مورد نیاز برای شارژ قرارداد، از مقادیر جدید استفاده شده
+MIN_WETH_TO_FUND_CONTRACT = Web3.to_wei(1, 'ether') # مطابق نسخه جدید فایل شما
+MIN_USDC_TO_FUND_CONTRACT = 1000 * (10**6)  # 1000 USDC مطابق نسخه جدید فایل شما
 TWO_POW_96 = Decimal(2**96)
 MIN_TICK_CONST = -887272
 MAX_TICK_CONST = 887272
@@ -55,7 +53,7 @@ logger = logging.getLogger('predictive_test')
 
 # --- Define path for addresses and results ---
 ADDRESS_FILE_PREDICTIVE = project_root / 'predictiveManager_address.json'
-RESULTS_FILE = project_root / 'position_results_predictive.csv'
+RESULTS_FILE = project_root / 'position_results_predictive.csv' # همانطور که در نسخه جدید است
 LSTM_API_URL = os.getenv('LSTM_API_URL', 'http://95.216.156.73:5000/predict_price?symbol=ETHUSDT&interval=4h')
 
 logger.info(f"Project Root for Predictive Test (from predictive_test.py): {project_root}")
@@ -73,7 +71,8 @@ class PredictiveTest(LiquidityTestBase):
             "POOL_READ_FAILED": "pool_read_failed", "API_FAILED": "api_failed",
             "CALCULATION_FAILED": "calculation_failed", "FUNDING_FAILED": "funding_failed",
             "TX_SENT": "tx_sent", "TX_SUCCESS_ADJUSTED": "tx_success_adjusted",
-            "TX_REVERTED": "tx_reverted", "TX_WAIT_FAILED": "tx_wait_failed",            "METRICS_UPDATE_FAILED": "metrics_update_failed",
+            "TX_REVERTED": "tx_reverted", "TX_WAIT_FAILED": "tx_wait_failed",
+            "METRICS_UPDATE_FAILED": "metrics_update_failed",
             "UNEXPECTED_ERROR": "unexpected_error"
         }
         super().__init__(contract_address, "PredictiveLiquidityManager")
@@ -82,27 +81,26 @@ class PredictiveTest(LiquidityTestBase):
         self.pool_contract = None
         # token0_decimals and token1_decimals will be set in super().setup()
 
-    def _reset_metrics(self):
-        """Initialize or reset all metrics to Predictive specific values."""
+    def _reset_metrics(self): # مطابق نسخه جدید فایل شما
         return {
             'timestamp': None, 'contract_type': 'Predictive',
             'action_taken': self.ACTION_STATES["INIT"], 'tx_hash': None,
-            'range_width_multiplier_setting': None, 
+            'range_width_multiplier_setting': None, # اضافه شده در نسخه جدید
             'predictedPrice_api': None, 'predictedTick_calculated': None,
-            'external_api_eth_price': None, 
+            'external_api_eth_price': None, # اضافه شده در نسخه جدید
             'actualPrice_pool': None, 'sqrtPriceX96_pool': 0, 'currentTick_pool': 0,
             'targetTickLower_calculated': 0, 'targetTickUpper_calculated': 0,
-            'initial_contract_balance_token0': None,  
-            'initial_contract_balance_token1': None, 
+            'initial_contract_balance_token0': None, # اضافه شده در نسخه جدید
+            'initial_contract_balance_token1': None, # اضافه شده در نسخه جدید
             'finalTickLower_contract': 0, 'finalTickUpper_contract': 0, 'liquidity_contract': 0,
-            'amount0_provided_to_mint': None, 
-            'amount1_provided_to_mint': None,
-            'fees_collected_token0': None, 
-            'fees_collected_token1': None, 
+            'amount0_provided_to_mint': None, # اضافه شده در نسخه جدید
+            'amount1_provided_to_mint': None, # اضافه شده در نسخه جدید
+            'fees_collected_token0': None, # اضافه شده در نسخه جدید
+            'fees_collected_token1': None, # اضافه شده در نسخه جدید
             'gas_used': 0, 'gas_cost_eth': 0.0, 'error_message': ""
         }
 
-    def setup(self, desired_range_width_multiplier: int) -> bool: 
+    def setup(self, desired_range_width_multiplier: int) -> bool: # پارامتر اضافه شده مطابق نسخه جدید
         if not super().setup(desired_range_width_multiplier): # Pass the multiplier to parent class setup
             self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
             self.metrics['error_message'] = "Base setup failed"
@@ -115,9 +113,9 @@ class PredictiveTest(LiquidityTestBase):
                 return False
 
             factory_address = self.contract.functions.factory().call()
-        # get_contract must be imported from web3_utils
+            # get_contract باید از web3_utils وارد شود
             factory_contract = get_contract(factory_address, "IUniswapV3Factory")
-            if not factory_contract: return False # Check if get_contract succeeded
+            if not factory_contract: return False # بررسی اینکه get_contract موفق بوده
 
             fee = self.contract.functions.fee().call()
             self.pool_address = factory_contract.functions.getPool(self.token0, self.token1, fee).call()
@@ -129,9 +127,11 @@ class PredictiveTest(LiquidityTestBase):
                 return False
                 
             self.pool_contract = get_contract(self.pool_address, "IUniswapV3Pool")
-            if not self.pool_contract: return False # check get_contract is successful
+            if not self.pool_contract: return False # بررسی اینکه get_contract موفق بوده
 
-            logger.info(f"Predictive Pool contract initialized at {self.pool_address}")            # Set rangeWidthMultiplier according to new version
+            logger.info(f"Predictive Pool contract initialized at {self.pool_address}")
+
+            # تنظیم rangeWidthMultiplier مطابق نسخه جدید
             logger.info(f"Setting rangeWidthMultiplier to {desired_range_width_multiplier} for Predictive contract...")
             self.metrics['range_width_multiplier_setting'] = desired_range_width_multiplier
             
@@ -148,7 +148,7 @@ class PredictiveTest(LiquidityTestBase):
                 'nonce': web3_utils.w3.eth.get_transaction_count(tx_account.address),
                 'chainId': int(web3_utils.w3.net.version)
             }
-            # Add gas estimation for setRangeWidthMultiplier
+            # افزودن تخمین گاز
             try:
                 gas_estimate = self.contract.functions.setRangeWidthMultiplier(desired_range_width_multiplier).estimate_gas({'from': tx_account.address})
                 tx_params['gas'] = int(gas_estimate * 1.2)
@@ -157,7 +157,8 @@ class PredictiveTest(LiquidityTestBase):
                 tx_params['gas'] = 200000
 
 
-            tx_set_rwm_build = self.contract.functions.setRangeWidthMultiplier(desired_range_width_multiplier)            # Send transaction using web3_utils.send_transaction which accepts private key
+            tx_set_rwm_build = self.contract.functions.setRangeWidthMultiplier(desired_range_width_multiplier)
+            # ارسال تراکنش با استفاده از web3_utils.send_transaction که کلید خصوصی را می‌پذیرد
             receipt_rwm = web3_utils.send_transaction(tx_set_rwm_build.build_transaction(tx_params), private_key)
             
             if not receipt_rwm or receipt_rwm.status == 0:
@@ -168,27 +169,31 @@ class PredictiveTest(LiquidityTestBase):
             logger.info(f"rangeWidthMultiplier set successfully for Predictive contract. TxHash: {receipt_rwm.transactionHash.hex()}")
             return True
         except Exception as e:
-            logger.exception(f"Predictive setup failed: {e}")  
+            logger.exception(f"Predictive setup failed: {e}") # تغییر پیام لاگ
             self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
-            self.metrics['error_message'] = f"Setup error: {str(e)}" 
-            return False   
-    def get_predicted_price_from_api(self) -> float | None:
+            self.metrics['error_message'] = f"Setup error: {str(e)}" # تغییر پیام لاگ
+            return False
+
+    # ---- متدهای بازگردانده شده از نسخه قدیمی ----
+    def get_predicted_price_from_api(self) -> float | None: # مطابق نسخه قدیمی [92-97]
         try:
             logger.info(f"Querying LSTM API at {LSTM_API_URL}...")
-            response = requests.get(LSTM_API_URL, timeout=15) # Increased timeout
-            response.raise_for_status() # Check HTTP errors
+            response = requests.get(LSTM_API_URL, timeout=15) # افزایش timeout
+            response.raise_for_status() # بررسی خطاهای HTTP
             data = response.json()
-              # Try to read different price keys from API response
+            
+            # تلاش برای خواندن کلیدهای مختلف قیمت از پاسخ API
             predicted_price_str = data.get('predicted_price') or data.get('price') or data.get('prediction')
+
             if predicted_price_str is None:
                 logger.error(f"Predicted price key not found in API response. Data: {data}")
                 raise ValueError("Predicted price not in API response")
 
             if isinstance(predicted_price_str, str):
-                predicted_price_str = predicted_price_str.replace("USD", "").strip()
+                predicted_price_str = predicted_price_str.replace("USD", "").strip() # حذف "USD" اگر وجود دارد
 
             predicted_price = float(predicted_price_str)
-            logger.info(f"Received predicted ETH price from API: {predicted_price:.4f} USD")
+            logger.info(f"Received predicted ETH price from API: {predicted_price:.4f} USD") # افزایش دقت نمایش
             self.metrics['predictedPrice_api'] = predicted_price
             return predicted_price
         except requests.exceptions.Timeout:
@@ -201,33 +206,24 @@ class PredictiveTest(LiquidityTestBase):
             self.metrics['action_taken'] = self.ACTION_STATES["API_FAILED"]
             self.metrics['error_message'] = f"API Request Error: {str(e)}"
             return None
-        except (ValueError, KeyError) as e: # ValueError for float(), KeyError for .get()
+        except (ValueError, KeyError) as e: # ValueError برای float()، KeyError برای .get()
             logger.exception(f"Error processing API response from {LSTM_API_URL}. Data: {data if 'data' in locals() else 'N/A'}. Error: {e}")
             self.metrics['action_taken'] = self.ACTION_STATES["API_FAILED"]
             self.metrics['error_message'] = f"API Response Processing Error: {str(e)}"
             return None
 
-    def calculate_tick_from_price(self, price: float) -> int | None:
-        """Calculate Uniswap V3 tick from a given price.
-        
-        The formula used is:
-        tick = floor(log_base_1.0001(sqrt(price_in_0/1_terms * 10^(decimals0 - decimals1))))
-        
-        For USDC/WETH pair where:
-        - USDC is token0 (decimals = 6)
-        - WETH is token1 (decimals = 18)
-        - price is in WETH/USDC (token1/token0)
-        """
+    def calculate_tick_from_price(self, price: float) -> int | None: # مطابق نسخه قدیمی [98-103]
         if self.token0_decimals is None or self.token1_decimals is None:
             logger.error("Token decimals not available for tick calculation. Ensure LiquidityTestBase.setup() was successful.")
             self.metrics['action_taken'] = self.ACTION_STATES["CALCULATION_FAILED"]
             self.metrics['error_message'] = "Token decimals missing for tick calc"
             return None
-            
         try:
             price_decimal = Decimal(str(price))
-            # Convert price from token1/token0 to token0/token1 (ETH/USDC to USDC/ETH)
-            # and adjust for decimals
+            # فرمول محاسبه تیک از قیمت برای Uniswap V3
+            # tick = floor(log_sqrt(1.0001)(sqrt(price_token1/token0 * 10^(decimals_token0 - decimals_token1))))
+            # ما قیمت ETH به USD را داریم (token1/token0). اگر token0=USDC و token1=WETH باشد:
+            # price_decimal همان قیمت WETH/USDC است.
             effective_sqrt_price_arg = price_decimal * (Decimal(10)**(self.token0_decimals - self.token1_decimals))
             
             if effective_sqrt_price_arg <= 0:
@@ -236,7 +232,6 @@ class PredictiveTest(LiquidityTestBase):
                 self.metrics['error_message'] = "Invalid arg for sqrt in tick calc"
                 return None
             
-            # Calculate sqrt of price for Uniswap V3's sqrt price format
             effective_sqrt_price = effective_sqrt_price_arg.sqrt()
             
             if effective_sqrt_price <= 0:
@@ -245,73 +240,63 @@ class PredictiveTest(LiquidityTestBase):
                 self.metrics['error_message'] = "Invalid effective_sqrt_price for tick calc"
                 return None
 
-            # Use Uniswap V3's tick calculation formula: tick = floor(ln(sqrt_price) / ln(sqrt(1.0001)))
+            # tick = floor(ln(effective_sqrt_price) / ln(sqrt(1.0001)))
             tick = math.floor(math.log(float(effective_sqrt_price)) / math.log(math.sqrt(1.0001)))
-            tick = max(MIN_TICK_CONST, min(MAX_TICK_CONST, tick))
+            tick = max(MIN_TICK_CONST, min(MAX_TICK_CONST, tick)) # اطمینان از اینکه تیک در محدوده مجاز است
             
-            logger.info(f"Tick calculation details:")
-            logger.info(f"  Input price: {price}")
-            logger.info(f"  Decimals adjustment: 10^({self.token0_decimals} - {self.token1_decimals})")
-            logger.info(f"  Effective sqrt price arg: {effective_sqrt_price_arg}")
-            logger.info(f"  Effective sqrt price: {effective_sqrt_price}")
-            logger.info(f"  Final tick: {tick}")
-            
+            logger.info(f"Calculated tick {tick} from price {price:.4f} (dec0: {self.token0_decimals}, dec1: {self.token1_decimals})")
             self.metrics['predictedTick_calculated'] = tick
             return tick
-            
         except Exception as e:
             logger.exception(f"Failed to calculate predicted tick from price {price}: {e}")
             self.metrics['action_taken'] = self.ACTION_STATES["CALCULATION_FAILED"]
             self.metrics['error_message'] = f"Tick Calculation Error: {str(e)}"
             return None
 
-    def update_pool_and_position_metrics(self, final_update=False): 
+    def update_pool_and_position_metrics(self, final_update=False): # مطابق نسخه قدیمی [104-107]
         try:
             if self.pool_contract:
                 slot0 = self.pool_contract.functions.slot0().call()
                 sqrt_price_x96_pool, current_tick_pool = slot0[0], slot0[1]
                 self.metrics['sqrtPriceX96_pool'] = sqrt_price_x96_pool
                 self.metrics['currentTick_pool'] = current_tick_pool
-                # _calculate_actual_price should be defined in LiquidityTestBase
+                # _calculate_actual_price باید در LiquidityTestBase تعریف شده باشد
                 self.metrics['actualPrice_pool'] = self._calculate_actual_price(sqrt_price_x96_pool) 
             else:
                 logger.warning("Pool contract not available for metrics update (pool_and_position).")
-                # self.metrics['action_taken'] = self.ACTION_STATES["POOL_READ_FAILED"] 
+                # self.metrics['action_taken'] = self.ACTION_STATES["POOL_READ_FAILED"] # ممکن است این حالت را نخواهیم خطا در نظر بگیریم
                 # self.metrics['error_message'] += ";Pool contract missing for metrics"
 
 
-            # get_position_info should be defined in LiquidityTestBase
+            # get_position_info باید در LiquidityTestBase تعریف شده باشد
             position_info = self.get_position_info() 
             if position_info:
-                # In the new version, fields like initial_contract_balance and others have been added
-                # Fields like finalTickLower_contract and others should be updated here
-                # If a position exists
-                if final_update or position_info.get('liquidity', 0) > 0 : 
+                # در نسخه جدید، فیلدهای initial_contract_balance و ... اضافه شده‌اند
+                # فیلدهای finalTickLower_contract و ... باید اینجا به‌روز شوند
+                # اگر پوزیشنی وجود داشته باشد
+                if final_update or position_info.get('liquidity', 0) > 0 : # فقط اگر پوزیشن معتبر است
                     self.metrics['finalTickLower_contract'] = position_info.get('tickLower', 0)
                     self.metrics['finalTickUpper_contract'] = position_info.get('tickUpper', 0)
                     self.metrics['liquidity_contract'] = position_info.get('liquidity', 0)
             else:
                 logger.warning("Could not get position info from contract for metrics update.")
-                # If no position exists, values remain zero (as set in _reset_metrics)
+                # اگر پوزیشنی وجود ندارد، مقادیر صفر باقی می‌مانند (که در _reset_metrics تنظیم شده)
 
         except Exception as e:
             logger.exception(f"Error updating pool/position metrics: {e}")
             self.metrics['action_taken'] = self.ACTION_STATES["METRICS_UPDATE_FAILED"]
             if not self.metrics.get('error_message'): self.metrics['error_message'] = f"Metrics Update Error: {str(e)}"
-    # ---- End of restored methods ----
+    # ---- پایان متدهای بازگردانده شده ----
 
-
-    def adjust_position(self, target_weth_balance: float, target_usdc_balance: float) -> bool: 
-        self.metrics = self._reset_metrics() # Reset metrics at start of each call
+    def adjust_position(self, target_weth_balance: float, target_usdc_balance: float) -> bool: # پارامترها مطابق نسخه جدید
+        self.metrics = self._reset_metrics() # ریست کردن متریک‌ها در ابتدای هر فراخوانی
         try:
-            # Get current ETH price from API
-            self.get_current_eth_price()
-            
-            # Read current rangeWidthMultiplier from contract for logging
+            # خواندن range_width_multiplier فعلی از قرارداد برای لاگ کردن
             current_rwm = self.contract.functions.rangeWidthMultiplier().call()
             self.metrics['range_width_multiplier_setting'] = current_rwm
         except Exception:
             logger.warning("Could not read current rangeWidthMultiplier from predictive contract for metrics.")
+            # اگر در setup مقداردهی شده باشد، همان استفاده می‌شود.
 
         adjustment_call_success = False
         private_key_env = os.getenv('PRIVATE_KEY')
@@ -322,36 +307,36 @@ class PredictiveTest(LiquidityTestBase):
             self.save_metrics()
             return False
         
-        funding_account = Account.from_key(private_key_env)
+        funding_account = Account.from_key(private_key_env) # نام متغیر به funding_account تغییر یافت
 
         try:
-            # 1. Get predicted price from API
-            predicted_price = self.get_predicted_price_from_api()
+            # 1. دریافت قیمت پیش‌بینی شده
+            predicted_price = self.get_predicted_price_from_api() # فراخوانی متد بازگردانده شده
             if predicted_price is None:
-                # metrics already updated in get_predicted_price_from_api
+                # self.metrics قبلاً در get_predicted_price_from_api به‌روز شده
                 self.save_metrics()
                 return False
 
-            # 2. Calculate tick from predicted price
-            predicted_tick = self.calculate_tick_from_price(predicted_price)
+            # 2. محاسبه تیک از قیمت پیش‌بینی شده
+            predicted_tick = self.calculate_tick_from_price(predicted_price) # فراخوانی متد بازگردانده شده
             if predicted_tick is None:
-                # metrics already updated in calculate_tick_from_price
+                # self.metrics قبلاً در calculate_tick_from_price به‌روز شده
                 self.save_metrics()
                 return False
+            
+            # 3. به‌روزرسانی اطلاعات اولیه استخر (قبل از تراکنش)
+            self.update_pool_and_position_metrics(final_update=False) # فراخوانی متد بازگردانده شده
 
-            # 3. Update initial pool and position metrics (before transaction)
-            self.update_pool_and_position_metrics(final_update=False)
-
-            # 4. Ensure precise contract funding
+            # 4. شارژ دقیق قرارداد (مطابق نسخه جدید)
             logger.info("Ensuring precise token balances for Predictive contract...")
             if not contract_funder.ensure_precise_token_balances(
                 contract_address=self.contract_address,
                 token0_address=self.token0,
                 token0_decimals=self.token0_decimals,
-                target_token0_amount_readable=target_usdc_balance,
+                target_token0_amount_readable=target_usdc_balance, # USDC معمولا token0 است
                 token1_address=self.token1,
                 token1_decimals=self.token1_decimals,
-                target_token1_amount_readable=target_weth_balance,
+                target_token1_amount_readable=target_weth_balance, # WETH معمولا token1 است
                 funding_account_private_key=private_key_env
             ):
                 logger.error("Precise funding for Predictive contract failed.")
@@ -360,7 +345,7 @@ class PredictiveTest(LiquidityTestBase):
                 self.save_metrics()
                 return False
 
-            # 5. Read initial contract balance (after funding and before main transaction) - as in the new version
+            # 5. خواندن موجودی اولیه قرارداد (بعد از شارژ و قبل از تراکنش اصلی) - مطابق نسخه جدید
             try:
                 token0_contract = get_contract(self.token0, "IERC20")
                 token1_contract = get_contract(self.token1, "IERC20")
@@ -372,7 +357,7 @@ class PredictiveTest(LiquidityTestBase):
             except Exception as bal_err:
                 logger.warning(f"Could not read initial contract balances for metrics: {bal_err}")
 
-            # 6. Call the updatePredictionAndAdjust function in the smart contract
+            # 6. فراخوانی تابع updatePredictionAndAdjust در قرارداد هوشمند
             logger.info(f"Calling updatePredictionAndAdjust with predictedTick: {predicted_tick}")
             
             tx_function_call = self.contract.functions.updatePredictionAndAdjust(predicted_tick)
@@ -381,16 +366,17 @@ class PredictiveTest(LiquidityTestBase):
                 'nonce': web3_utils.w3.eth.get_transaction_count(funding_account.address),
                 'chainId': int(web3_utils.w3.net.version)
             }
-            try: # Gas estimation
+            
+            try: # تخمین گاز
                 gas_estimate = tx_function_call.estimate_gas({'from': funding_account.address})
-                tx_parameters['gas'] = int(gas_estimate * 1.25) # Increase buffer factor
+                tx_parameters['gas'] = int(gas_estimate * 1.25) # افزایش ضریب بافر
                 logger.info(f"Estimated gas for 'updatePredictionAndAdjust': {gas_estimate}, using: {tx_parameters['gas']}")
             except Exception as est_err:
                 logger.warning(f"Gas estimation failed for 'updatePredictionAndAdjust': {est_err}. Using default 1,500,000")
                 tx_parameters['gas'] = 1500000
 
             built_transaction = tx_function_call.build_transaction(tx_parameters)
-            receipt = web3_utils.send_transaction(built_transaction, private_key_env)
+            receipt = web3_utils.send_transaction(built_transaction, private_key_env) # ارسال کلید خصوصی
 
             self.metrics['tx_hash'] = receipt.transactionHash.hex() if receipt else None
             self.metrics['action_taken'] = self.ACTION_STATES["TX_SENT"]
@@ -398,29 +384,35 @@ class PredictiveTest(LiquidityTestBase):
             if receipt and receipt.status == 1:
                 logger.info(f"Adjustment transaction successful (Status 1). Tx: {self.metrics['tx_hash']}")
                 self.metrics['gas_used'] = receipt.get('gasUsed', 0)
-                effective_gas_price = receipt.get('effectiveGasPrice', web3_utils.w3.eth.gas_price) 
+                effective_gas_price = receipt.get('effectiveGasPrice', web3_utils.w3.eth.gas_price) # در صورت نبود، از gas_price فعلی استفاده کن
                 self.metrics['gas_cost_eth'] = float(Web3.from_wei(self.metrics['gas_used'] * effective_gas_price, 'ether'))
                 self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"]
-                adjustment_call_success = True          
+                adjustment_call_success = True
+
+                # پردازش رویدادها برای استخراج مقادیر (مطابق نسخه جدید)
                 try:
-                    # Process LiquidityOperation events
-                    mint_logs = self.contract.events.LiquidityOperation().process_receipt(receipt, errors=web3_utils.DISCARD)
-                    for log_entry in mint_logs:
-                        if log_entry.args.operationType == "MINT":
-                            self.metrics['amount0_provided_to_mint'] = log_entry.args.amount0Actual
-                            self.metrics['amount1_provided_to_mint'] = log_entry.args.amount1Actual
-                        elif log_entry.args.operationType == "REMOVE":
-                            self.metrics['fees_collected_token0'] = log_entry.args.amount0Collected
-                            self.metrics['fees_collected_token1'] = log_entry.args.amount1Collected
-                    # Process PredictionAdjustmentMetrics events
-                    adj_metrics_logs = self.contract.events.PredictionAdjustmentMetrics().process_receipt(receipt, errors=web3_utils.DISCARD)
+                    # پردازش رویداد LiquidityOperation
+                    mint_logs = self.contract.events.LiquidityOperation().process_receipt(receipt, errors=logging.WARN)
+                    for log_entry in mint_logs: # تغییر نام متغیر برای جلوگیری از تداخل با ماژول logging
+                        if log_entry.args.operationType == "MINT": # مطمئن شوید operationType در رویداد شما وجود دارد
+                            self.metrics['amount0_provided_to_mint'] = log_entry.args.amount0Actual # یا amount0
+                            self.metrics['amount1_provided_to_mint'] = log_entry.args.amount1Actual # یا amount1
+                        elif log_entry.args.operationType == "REMOVE": # یا هر نام دیگری برای نوع عملیات
+                            self.metrics['fees_collected_token0'] = log_entry.args.amount0Collected # یا amount0
+                            self.metrics['fees_collected_token1'] = log_entry.args.amount1Collected # یا amount1
+                    
+                    # پردازش رویداد PredictionAdjustmentMetrics (یا نام مشابه در قرارداد شما)
+                    # اگر این رویداد شامل finalTickLower/Upper است
+                    adj_metrics_logs = self.contract.events.PredictionAdjustmentMetrics().process_receipt(receipt, errors=logging.WARN)
                     if adj_metrics_logs:
+                        # این بخش به جای خواندن مستقیم از get_position_info برای تیک‌های نهایی استفاده می‌شود
                         self.metrics['finalTickLower_contract'] = adj_metrics_logs[0].args.finalTickLower
                         self.metrics['finalTickUpper_contract'] = adj_metrics_logs[0].args.finalTickUpper
-                        # self.metrics['liquidity_contract'] = adj_metrics_logs[0].args.finalLiquidity # If available in event
+                        # self.metrics['liquidity_contract'] = adj_metrics_logs[0].args.finalLiquidity # اگر در رویداد باشد
                 except Exception as log_processing_error:
-                    logger.error(f"Error processing logs for predictive transaction: {log_processing_error}")         
-            elif receipt: # Transaction failed (status 0)
+                    logger.error(f"Error processing logs for predictive transaction: {log_processing_error}")
+
+            elif receipt: # تراکنش ناموفق بود (status 0)
                 logger.error(f"Adjustment transaction reverted (Status 0). Tx: {self.metrics['tx_hash']}")
                 self.metrics['action_taken'] = self.ACTION_STATES["TX_REVERTED"]
                 self.metrics['error_message'] = "tx_reverted_onchain"
@@ -428,37 +420,39 @@ class PredictiveTest(LiquidityTestBase):
                 effective_gas_price = receipt.get('effectiveGasPrice', web3_utils.w3.eth.gas_price)
                 self.metrics['gas_cost_eth'] = float(Web3.from_wei(self.metrics['gas_used'] * effective_gas_price, 'ether'))
                 adjustment_call_success = False
-            else: # Transaction sending failed completely (no receipt)
+            else: # ارسال تراکنش به طور کلی ناموفق بود (رسید دریافت نشد)
                 logger.error("Adjustment transaction sending/receipt failed.")
-                if self.metrics['action_taken'] == self.ACTION_STATES["TX_SENT"]:
+                if self.metrics['action_taken'] == self.ACTION_STATES["TX_SENT"]: # اگر قبلاً به TX_SENT رفته بود
                     self.metrics['action_taken'] = self.ACTION_STATES["TX_WAIT_FAILED"]
-                if not self.metrics['error_message']:
-                    self.metrics['error_message'] = "send_transaction for adjustment failed"
+                if not self.metrics['error_message']: self.metrics['error_message'] = "send_transaction for adjustment failed"
                 adjustment_call_success = False
 
         except Exception as tx_err:
             logger.exception(f"Error during adjustment transaction call/wait: {tx_err}")
             self.metrics['action_taken'] = self.ACTION_STATES["UNEXPECTED_ERROR"]
             self.metrics['error_message'] = f"TxError: {str(tx_err)}"
-         
-            return False 
+            # self.save_metrics() # در finally ذخیره می‌شود
+            return False # در اینجا return می‌کنیم چون یک خطای غیرمنتظره در ارسال تراکنش رخ داده
 
-        finally: 
+        finally: # اطمینان از اینکه متریک‌ها همیشه ذخیره می‌شوند
+            # 7. به‌روزرسانی نهایی اطلاعات استخر و پوزیشن (بعد از تراکنش)
+            # اگر رویدادها شامل تیک‌های نهایی و نقدینگی نبودند، این بخش آنها را پر می‌کند
             if not self.metrics['finalTickLower_contract'] and not self.metrics['finalTickUpper_contract']:
-                 self.update_pool_and_position_metrics(final_update=True) # Call restored method
+                 self.update_pool_and_position_metrics(final_update=True) # فراخوانی متد بازگردانده شده
             self.save_metrics()
         
         return adjustment_call_success
     
-    def save_metrics(self): 
-        self.metrics['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')        # Columns matching _reset_metrics in new version
+    def save_metrics(self): # مطابق نسخه جدید فایل شما
+        self.metrics['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # ستون‌ها مطابق با _reset_metrics در نسخه جدید
         columns = [
             'timestamp', 'contract_type', 'action_taken', 'tx_hash',
             'range_width_multiplier_setting',
             'predictedPrice_api', 'predictedTick_calculated',
-            'external_api_eth_price', # Ensure this value is populated
+            'external_api_eth_price', # اطمینان از اینکه این مقدار جایی پر می‌شود
             'actualPrice_pool', 'sqrtPriceX96_pool', 'currentTick_pool',
-            'targetTickLower_calculated', 'targetTickUpper_calculated', 
+            'targetTickLower_calculated', 'targetTickUpper_calculated', # اینها باید توسط قرارداد محاسبه و از رویداد خوانده شوند یا جداگانه محاسبه شوند
             'initial_contract_balance_token0',
             'initial_contract_balance_token1',
             'finalTickLower_contract', 'finalTickUpper_contract', 'liquidity_contract',
@@ -470,12 +464,13 @@ class PredictiveTest(LiquidityTestBase):
         ]
         try:
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            file_exists = RESULTS_FILE.is_file()            # Ensure all columns exist in self.metrics or get default values
+            file_exists = RESULTS_FILE.is_file()
+            # اطمینان از اینکه همه ستون‌ها در self.metrics وجود دارند یا مقدار پیش‌فرض می‌گیرند
             row_data = {col: self.metrics.get(col) for col in columns}
 
             with open(RESULTS_FILE, 'a', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=columns, extrasaction='ignore') # extrasaction='ignore' to ignore extra keys in row_data
-                if not file_exists or os.path.getsize(RESULTS_FILE) == 0: # Check if file is empty
+                writer = csv.DictWriter(f, fieldnames=columns, extrasaction='ignore') # extrasaction='ignore' برای نادیده گرفتن کلیدهای اضافی در row_data
+                if not file_exists or os.path.getsize(RESULTS_FILE) == 0: # بررسی خالی بودن فایل
                     writer.writeheader()
                 writer.writerow(row_data)
             logger.info(f"Predictive metrics saved to {RESULTS_FILE}")
@@ -483,7 +478,7 @@ class PredictiveTest(LiquidityTestBase):
             logger.exception(f"Failed to save predictive metrics: {e}")
 
 # --- Main Function ---
-def main(): 
+def main(): # مطابق نسخه جدید فایل شما
     logger.info("="*50)
     logger.info("Starting Predictive Liquidity Manager Test on Fork")
     logger.info("="*50)
@@ -500,8 +495,8 @@ def main():
     try:
         if not ADDRESS_FILE_PREDICTIVE.exists():
             logger.error(f"Predictive address file not found: {ADDRESS_FILE_PREDICTIVE}")
-           
-            temp_test_for_error_log = PredictiveTest(contract_address="0x0") 
+            # در صورت عدم وجود فایل، یک ردیف خطا در CSV ذخیره کن
+            temp_test_for_error_log = PredictiveTest(contract_address="0x0") # آدرس موقت
             temp_test_for_error_log.metrics['action_taken'] = temp_test_for_error_log.ACTION_STATES["SETUP_FAILED"]
             temp_test_for_error_log.metrics['error_message'] = f"Address file not found: {ADDRESS_FILE_PREDICTIVE}"
             temp_test_for_error_log.save_metrics()
@@ -515,7 +510,7 @@ def main():
             predictive_address = addresses_data.get('address')
             if not predictive_address:
                 logger.error(f"Key 'address' not found in {ADDRESS_FILE_PREDICTIVE}")
-              
+                # ذخیره خطا در CSV
                 temp_test_for_error_log = PredictiveTest(contract_address="0x0")
                 temp_test_for_error_log.metrics['action_taken'] = temp_test_for_error_log.ACTION_STATES["SETUP_FAILED"]
                 temp_test_for_error_log.metrics['error_message'] = f"Key 'address' not found in {ADDRESS_FILE_PREDICTIVE}"
@@ -524,10 +519,10 @@ def main():
         logger.info(f"Loaded Predictive Manager Address: {predictive_address}")
 
         test = PredictiveTest(predictive_address)
-        # execute_test_steps should accept the necessary parameters for setup and adjust_position
-        # These values should come from an external source (such as a config file or command-line arguments)
-        # For example:
-        desired_rwm = int(os.getenv('PREDICTIVE_RWM', '50'))
+        # execute_test_steps باید پارامترهای لازم برای setup و adjust_position را بپذیرد
+        # این مقادیر باید از یک منبع خارجی (مانند یک فایل کانفیگ یا آرگومان‌های خط فرمان) بیایند
+        # برای مثال:
+        desired_rwm = int(os.getenv('PREDICTIVE_RWM', '50')) # خواندن از متغیر محیطی یا مقدار پیش‌فرض
         target_weth = float(os.getenv('PREDICTIVE_TARGET_WETH', '1.0'))
         target_usdc = float(os.getenv('PREDICTIVE_TARGET_USDC', '2000.0'))
 
@@ -540,15 +535,16 @@ def main():
 
     except FileNotFoundError as e:
         logger.error(f"Setup Error - Address file not found: {e}")
-       
+        # خطا قبلاً در CSV ذخیره شده است
     except ValueError as e:
         logger.error(f"Configuration Error - Problem reading address file or address key missing: {e}")
-      
+        # خطا قبلاً در CSV ذخیره شده است
     except Exception as e:
         logger.exception(f"An unexpected error occurred during predictive main execution:")
-        
-        if 'test' not in locals() and predictive_address: 
-            test = PredictiveTest(predictive_address) 
+        # ذخیره خطای عمومی در CSV
+        # این بخش ممکن است نیاز به تعریف یک نمونه موقت از PredictiveTest داشته باشد اگر test تعریف نشده باشد
+        if 'test' not in locals() and predictive_address: # اگر test تعریف نشده ولی آدرس داریم
+            test = PredictiveTest(predictive_address) # یا یک آدرس موقت
         elif 'test' not in locals():
             test = PredictiveTest("0x0")
 
