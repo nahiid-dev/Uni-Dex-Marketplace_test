@@ -12,6 +12,7 @@ from pathlib import Path
 from web3 import Web3
 from eth_account import Account
 from decimal import Decimal, getcontext
+from web3.logs import DISCARD  # Added import for DISCARD
 
 # --- Adjust path imports ---
 current_file_path = Path(__file__).resolve()
@@ -39,6 +40,9 @@ MIN_USDC_TO_FUND_CONTRACT = 1000 * (10**6) # 1000 USDC
 TWO_POW_96 = Decimal(2**96)
 MIN_TICK_CONST = -887272 # Uniswap V3 min tick
 MAX_TICK_CONST = 887272 # Uniswap V3 max tick
+Q96 = Decimal(2**96)  # Added for price calculation
+TOKEN0_DECIMALS = 6   # USDC decimals
+TOKEN1_DECIMALS = 18  # WETH decimals
 
 
 # --- Setup Logging ---
@@ -121,6 +125,15 @@ class BaselineTest(LiquidityTestBase):
         self.token0_contract_instance = None
         self.token1_contract_instance = None
         self.metrics = self._reset_metrics()
+
+    def sqrt_price_x96_to_price_token0_in_token1(self, sqrt_price_x96_str: str) -> Decimal:
+        """Convert sqrtPriceX96 to price of token0 in terms of token1 (USDC in WETH)"""
+        sqrt_price_x96 = Decimal(sqrt_price_x96_str)
+        price_t1_in_t0 = (sqrt_price_x96 / Q96) ** 2
+        price_t0_in_t1 = Decimal(1) / price_t1_in_t0
+        decimals_adjustment = Decimal(10) ** (TOKEN0_DECIMALS - TOKEN1_DECIMALS)
+        return price_t0_in_t1 / decimals_adjustment
+
     def _estimate_liquidity(self, tick_lower: int, tick_upper: int) -> int: # According to old version [202-206]
         """Estimate liquidity based on token balances and tick range (simple approximation)."""
         # This method is a simple estimate and should not be used as an accurate source of liquidity.
@@ -286,8 +299,8 @@ class BaselineTest(LiquidityTestBase):
               # Update metrics here
             self.metrics['sqrtPriceX96_pool'] = sqrt_price_x96
             self.metrics['currentTick_pool'] = tick
-            # _calculate_actual_price must be defined in LiquidityTestBase
-            self.metrics['actualPrice_pool'] = self._calculate_actual_price(sqrt_price_x96) 
+            # Calculate actual price using the new method
+            self.metrics['actualPrice_pool'] = self.sqrt_price_x96_to_price_token0_in_token1(str(sqrt_price_x96))
             
             logger.info(f"Pool state read: Tick={tick}, SqrtPriceX96={sqrt_price_x96}, ActualPrice={self.metrics['actualPrice_pool']:.4f}")
             return sqrt_price_x96, tick
@@ -489,40 +502,22 @@ class BaselineTest(LiquidityTestBase):
                 eff_gas_price_base = receipt_base.get('effectiveGasPrice', web3_utils.w3.eth.gas_price)
                 self.metrics['gas_cost_eth'] = float(Web3.from_wei(self.metrics['gas_used'] * eff_gas_price_base, 'ether'))
                 adjustment_call_success = True                # Process events for Baseline
-                # BaselineMinimal.sol may have different events.
-                # We assume it has PositionMinted and PositionRemoved/FeesCollected events
                 try:
-                    # For MINT (if adjustLiquidityWithCurrentPrice creates a new position)
-                    mint_logs_base = self.contract.events.PositionMinted().process_receipt(receipt_base, errors=logging.WARN)
+                    # Process PositionMinted event with DISCARD flag
+                    mint_logs_base = self.contract.events.PositionMinted().process_receipt(receipt_base, errors=DISCARD)
                     for log_m_b in mint_logs_base:
-                        self.metrics['amount0_provided_to_mint'] = log_m_b.args.amount0Actual
-                        self.metrics['amount1_provided_to_mint'] = log_m_b.args.amount1Actual
-                        # Final tick and liquidity values are read from this event or get_position_info
+                        self.metrics['amount0_provided_to_mint'] = log_m_b.args.amount0  # Changed from amount0Actual to amount0
+                        self.metrics['amount1_provided_to_mint'] = log_m_b.args.amount1  # Changed from amount1Actual to amount1
                         self.metrics['finalTickLower_contract'] = log_m_b.args.tickLower
                         self.metrics['finalTickUpper_contract'] = log_m_b.args.tickUpper
                         self.metrics['finalLiquidity_contract'] = log_m_b.args.liquidity
-                        self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"] # If minted, it means position was adjusted                    # For REMOVE/COLLECT (if previous position is removed and fees are collected)
-                    # Match the event name with your contract
-                    # remove_logs_base = self.contract.events.PositionRemovedAndFeesCollected().process_receipt(receipt_base, errors=logging.WARN)
-                    # for log_r_b in remove_logs_base:
-                    #     self.metrics['fees_collected_token0'] = log_r_b.args.fees0
-                    #     self.metrics['fees_collected_token1'] = log_r_b.args.fees1
+                        self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"]
                     
-                    # If contract emits a general status event like BaselineAdjustmentMetrics in old version
-                    # This section of old code [263-268] might be useful
-                    # event_name_base = "BaselineAdjustmentMetrics" # or a similar name
-                    # if hasattr(self.contract.events, event_name_base):
-                    #     logs_adj_base = self.contract.events[event_name_base]().process_receipt(receipt_base, errors=logging.WARN)
-                    #     if logs_adj_base and len(logs_adj_base) > 0:
-                    #         adjusted_onchain = logs_adj_base[0]['args'].get('adjusted', False) # Assuming 'adjusted' field exists                    #         self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"] if adjusted_onchain else self.ACTION_STATES["TX_SUCCESS_SKIPPED_ONCHAIN"]
-                    #         # Final tick values and liquidity from event
-                    #         self.metrics['finalTickLower_contract'] = logs_adj_base[0]['args'].get('finalTickLower', self.metrics['finalTickLower_contract'])
-                    #         self.metrics['finalTickUpper_contract'] = logs_adj_base[0]['args'].get('finalTickUpper', self.metrics['finalTickUpper_contract'])
-                    #         self.metrics['finalLiquidity_contract'] = logs_adj_base[0]['args'].get('finalLiquidity', self.metrics['finalLiquidity_contract'])
-                    #     else: # If event was not found but transaction was successful
-                    #         self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"]
-                    # else: # If contract doesn't have this event
-                    #     self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_ADJUSTED"]
+                    # Process other events with DISCARD flag if needed
+                    # remove_logs_base = self.contract.events.PositionRemovedAndFeesCollected().process_receipt(receipt_base, errors=DISCARD)
+                    # for log_r_b in remove_logs_base:
+                    #     self.metrics['fees_collected_token0'] = log_r_b.args.amount0  # Changed from fees0 to amount0
+                    #     self.metrics['fees_collected_token1'] = log_r_b.args.amount1  # Changed from fees1 to amount1
 
                 except Exception as log_err_base:
                     logger.error(f"Error processing logs for baseline transaction: {log_err_base}")
@@ -549,7 +544,6 @@ class BaselineTest(LiquidityTestBase):
         
         finally: # Ensure metrics and final position info are always saved
             # 8. Final update of position information (after transaction)
-            # If events didn't include complete final position info, use get_position_info
             final_pos_info = self.get_position_info()
             if final_pos_info:        
                 self.metrics['finalTickLower_contract'] = final_pos_info.get('tickLower', self.metrics['finalTickLower_contract']) # If not filled from event
@@ -557,19 +551,21 @@ class BaselineTest(LiquidityTestBase):
                 self.metrics['finalLiquidity_contract'] = final_pos_info.get('liquidity', self.metrics['finalLiquidity_contract'])
             else:
                 logger.warning("Baseline: Could not get final position info after tx. Metrics might be incomplete for final state.")
-                # If final position info is not available, at least use target ticks as final ticks
                 if self.metrics['finalTickLower_contract'] is None : self.metrics['finalTickLower_contract'] = target_lower_tick
                 if self.metrics['finalTickUpper_contract'] is None : self.metrics['finalTickUpper_contract'] = target_upper_tick
-                # Liquidity might remain unknown
+            
             self.save_metrics()           
             return adjustment_call_success    
     
     def save_metrics(self): # According to your new file version
         self.metrics['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # تبدیل مقادیر Decimal به رشته با فرمت مناسب
-        if isinstance(self.metrics.get('actualPrice_pool'), Decimal):
-            self.metrics['actualPrice_pool'] = str(self.metrics['actualPrice_pool'])
+        # Handle actualPrice_pool formatting
+        metric_value = self.metrics.get('actualPrice_pool')
+        if isinstance(metric_value, Decimal):
+            self.metrics['actualPrice_pool'] = f"{metric_value:.6f}"
+        elif metric_value is None:
+            self.metrics['actualPrice_pool'] = ""
         
         # Columns match _reset_metrics in new version
         columns = [
