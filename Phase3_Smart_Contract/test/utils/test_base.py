@@ -76,20 +76,35 @@ class LiquidityTestBase(ABC):
             self.contract = web3_utils.get_contract(self.contract_address, self.contract_name)
             if not self.contract:
                 logger.error(f"Failed to load contract {self.contract_name}")
-                return False
-
+                return False            
             self.token0 = Web3.to_checksum_address(self.contract.functions.token0().call())
             self.token1 = Web3.to_checksum_address(self.contract.functions.token1().call())
 
-            # Get decimals
+            # Get decimals and symbol/name for better logging
             token0_contract = web3_utils.get_contract(self.token0, "IERC20")
             self.token0_decimals = token0_contract.functions.decimals().call()
+            token0_name = "Unknown"
+            try:
+                token0_name = token0_contract.functions.symbol().call()
+            except:
+                pass
 
             token1_contract = web3_utils.get_contract(self.token1, "IERC20")
             self.token1_decimals = token1_contract.functions.decimals().call()
+            token1_name = "Unknown"
+            try:
+                token1_name = token1_contract.functions.symbol().call()
+            except:
+                pass
 
-            logger.info(f"Token0: {self.token0} (Decimals: {self.token0_decimals})")
-            logger.info(f"Token1: {self.token1} (Decimals: {self.token1_decimals})")
+            # Verify token order (USDC should be token0, WETH token1)
+            logger.info("Token configuration:")
+            logger.info(f"  Token0: {token0_name} at {self.token0} (Decimals: {self.token0_decimals})")
+            logger.info(f"  Token1: {token1_name} at {self.token1} (Decimals: {self.token1_decimals})")
+            if self.token0_decimals == 6 and self.token1_decimals == 18:
+                logger.info("✅ Token order verified: USDC(6) is token0, WETH(18) is token1")
+            else:
+                logger.warning(f"⚠️ Unexpected token decimals configuration: token0({self.token0_decimals}), token1({self.token1_decimals})")
             
             logger.info(f"Setup completed for {self.contract_name}")
             return True
@@ -204,47 +219,55 @@ class LiquidityTestBase(ABC):
 
         except Exception as e:
             logger.exception(f"Failed to get position info from contract {self.contract_name}: {e}")
-            return None
-
-    def _calculate_actual_price(self, sqrt_price_x96: int) -> float:
+            return None     
+    def _calculate_actual_price(self, sqrt_price_x96: int) -> Decimal:
         """
-        Calculates the human-readable price from a sqrtPriceX96 value.
-        For WETH/USDC pool where USDC is token0 and WETH is token1:
-        - sqrtPriceX96 represents √(price) * 2^96
-        - price here means how many token0 (USDC) for one token1 (WETH)
-        - Example: If ETH = $2000 USDC, then price should be 2000
+        Calculates the human-readable price from sqrtPriceX96.
+        For USDC/WETH pool:
+        - token0 is USDC (6 decimals)
+        - token1 is WETH (18 decimals)
+        - sqrtPriceX96 represents: √(token1/token0) * 2^96
+        We need to:
+        1. Convert sqrtPriceX96 to actual price ratio
+        2. Invert the ratio since we want USDC/WETH not WETH/USDC
+        3. Adjust for decimals
         """
         if not sqrt_price_x96 or sqrt_price_x96 == 0:
-            return 0.0
+            return Decimal(0)
         if self.token0_decimals is None or self.token1_decimals is None:
             logger.error("Token decimals not set, cannot calculate actual price.")
-            return 0.0
-
-        TWO_POW_96 = Decimal(2**96)
+            return Decimal(0)
+    
         try:
-            # Convert sqrtPriceX96 to Decimal for precise calculation
+            # Convert inputs to Decimal for precise calculation
             sqrt_price_x96_dec = Decimal(sqrt_price_x96)
+            two_pow_96 = Decimal(2 ** 96)
+    
+            # Get the square root of the price ratio (token1/token0)
+            sqrt_price = sqrt_price_x96_dec / two_pow_96
             
-            # Calculate the square of sqrt_price
-            # This gives price = token1/token0 in terms of raw amounts
-            price_raw = (sqrt_price_x96_dec / TWO_POW_96) ** 2
+            # Square it to get the actual ratio
+            price_ratio = sqrt_price * sqrt_price
             
-            # Adjust for decimals to get the actual price
-            # For USDC (6 decimals) and WETH (18 decimals):
-            # price_adjusted = price_raw * 10^(decimals_token0 - decimals_token1)
+            # Invert to get token0/token1 (USDC/WETH)
+            price = Decimal(1) / price_ratio
+    
+            # Adjust for decimals: Since we inverted the price, we also invert the decimal adjustment
             decimal_adjustment = Decimal(10) ** (self.token0_decimals - self.token1_decimals)
-            actual_price = price_raw * decimal_adjustment
+            actual_price = price * decimal_adjustment            
+            logger.debug(f"Price calculation for sqrtPriceX96={sqrt_price_x96}:")
+            logger.debug(f"  sqrt_price (after 2^96 division): {sqrt_price}")
+            logger.debug(f"  price_ratio (WETH/USDC): {price_ratio}")
+            logger.debug(f"  inverted_price (USDC/WETH): {price}")
+            logger.debug(f"  decimal_adjustment (10^({self.token0_decimals}-{self.token1_decimals})): {decimal_adjustment}")
+            logger.debug(f"  final_price (USDC/WETH): {actual_price}")
 
-            logger.debug("Price calculation details:")
-            logger.debug(f"  sqrtPriceX96: {sqrt_price_x96}")
-            logger.debug(f"  raw price (token1/token0): {float(price_raw)}")
-            logger.debug(f"  decimal adjustment (10^({self.token0_decimals}-{self.token1_decimals})): {float(decimal_adjustment)}")
-            logger.debug(f"  final price (token0/token1): {float(actual_price)}")
-            
-            return float(actual_price)
+            # برگرداندن مقدار به صورت Decimal برای حفظ دقت اعشار
+            return actual_price
+    
         except Exception as e:
-            logger.exception(f"Error calculating actual price from sqrtPriceX96={sqrt_price_x96}: {e}")
-            return 0.0
+            logger.exception(f"Error calculating price from sqrtPriceX96={sqrt_price_x96}: {e}")
+            return Decimal(0)
 
     def get_current_eth_price(self) -> float | None:
         """

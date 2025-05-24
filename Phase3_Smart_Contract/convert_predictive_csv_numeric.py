@@ -1,165 +1,200 @@
 import csv
-from decimal import Decimal, getcontext
-import math
+from decimal import Decimal, getcontext, ROUND_HALF_UP
 
-# Set higher precision for decimal calculations
-getcontext().prec = 50
+# تنظیم دقت محاسبات اعشاری
+getcontext().prec = 50  # دقت کافی برای محاسبات Uniswap V3
 
-def tick_to_price(tick):
-    """Convert a tick value to a human readable price."""
-    if tick is None or tick == "" or tick == "0":
+# اعشار توکن‌ها
+TOKEN0_DECIMALS = 6   # USDC
+TOKEN1_DECIMALS = 18  # WETH
+
+# ثابت‌های Uniswap V3
+Q96 = Decimal(2**96)
+TICK_BASE = Decimal('1.0001')
+
+def sqrt_price_x96_to_price_token1_in_token0(sqrt_price_x96_str: str) -> Decimal:
+    """
+    محاسبه قیمت token1 بر حسب token0 از sqrtPriceX96
+    برای استخر USDC/WETH: قیمت WETH بر حسب USDC (مثلاً 2634.12 USDC برای 1 WETH)
+    """
+    if not sqrt_price_x96_str or sqrt_price_x96_str.strip() == "":
         return None
+    
     try:
-        tick = float(tick)
-        # Using the proper Uniswap V3 formula: price = 1.0001^tick
-        price = Decimal('1.0001') ** Decimal(str(tick))
-        return float(price)
-    except:
-        return None
-
-def format_decimal(val, decimals=18):
-    """Convert wei/raw values to human readable decimals."""
-    if val is None or val == "" or val == "0":
-        return "0"
-    try:
-        val_decimal = Decimal(str(val))
-        human_readable = val_decimal / Decimal(10 ** decimals)
-        return str(human_readable)
-    except:
-        return str(val)
-
-input_file = "position_results_predictive.csv"
-output_file = "position_results_predictive_numeric.csv"
-
-# Fields that should be converted to numeric (based on your CSV structure)
-numeric_fields = [
-    # Price fields (float)
-    'predictedPrice_api', 'actualPrice_pool', 'gas_cost_eth',
-    # Tick fields (int)
-    'predictedTick_calculated', 'currentTick_pool',
-    'targetTickLower_calculated', 'targetTickUpper_calculated',
-    'finalTickLower_contract', 'finalTickUpper_contract',
-    # Balance and token amount fields (Decimals - keep full precision)
-    'initial_contract_balance_token0', 'initial_contract_balance_token1',
-    'amount0_provided_to_mint', 'amount1_provided_to_mint',
-    'fees_collected_token0', 'fees_collected_token1',
-    # Other numeric fields
-    'sqrtPriceX96_pool', 'liquidity_contract', 'gas_used',
-    'range_width_multiplier_setting'
-]
-
-# Categorize fields by their type for proper conversion
-tick_fields = {
-    'predictedTick_calculated', 'currentTick_pool',
-    'targetTickLower_calculated', 'targetTickUpper_calculated',
-    'finalTickLower_contract', 'finalTickUpper_contract'
-}
-
-balance_fields = {
-    'initial_contract_balance_token0', 'initial_contract_balance_token1',
-    'amount0_provided_to_mint', 'amount1_provided_to_mint',
-    'fees_collected_token0', 'fees_collected_token1'
-}
-
-def parse_numeric(val, field_name=None):
-    """Convert string to appropriate numeric type based on field type."""
-    if val is None or val == "":
-        return None, None
-    try:
-        # For tick fields - convert to both integer and price
-        if field_name in tick_fields:
-            tick_val = int(float(val))
-            return tick_val, tick_to_price(tick_val)
+        sqrt_price_x96 = Decimal(sqrt_price_x96_str)
+        if sqrt_price_x96 == 0:
+            return Decimal(0)
         
-        # For balance fields - use Decimal to maintain precision
-        if field_name in balance_fields:
-            from decimal import Decimal
-            raw_val = str(Decimal(val))
-            return raw_val, format_decimal(raw_val)
-            
-        # For other fields - try integer first, then float
-        if "." not in val and "e" not in val.lower() and "E" not in val:
-            try:
-                num_val = int(val)
-                return num_val, str(num_val)
-            except ValueError:
-                pass
-        num_val = float(val)
-        return num_val, str(num_val)
-    except ValueError:
-        if val.lower() == "true":
-            return 1, "1"
-        if val.lower() == "false":
-            return 0, "0"
-        return None, None
+        # محاسبه قیمت token1 بر حسب token0
+        price = (sqrt_price_x96 / Q96) ** 2
+        
+        # تنظیم اعشار
+        decimals_adjustment = Decimal(10) ** (TOKEN1_DECIMALS - TOKEN0_DECIMALS)
+        return price / decimals_adjustment
+    except Exception as e:
+        print(f"Error converting sqrtPriceX96: {e}")
+        return None
 
-def get_token_decimals(column_name):
-    """Determine the number of decimals based on the column name."""
-    column_lower = column_name.lower()
-    if any(token in column_lower for token in ['usdc', 'token0']):
-        return 6
-    elif any(token in column_lower for token in ['eth', 'weth', 'token1']):
-        return 18
-    return 0  # For non-token values
+def sqrt_price_x96_to_price_token0_in_token1(sqrt_price_x96_str: str) -> Decimal:
+    """
+    محاسبه قیمت token0 بر حسب token1 از sqrtPriceX96
+    برای استخر USDC/WETH: قیمت USDC بر حسب WETH (مثلاً 0.00038 WETH برای 1 USDC)
+    """
+    if not sqrt_price_x96_str or sqrt_price_x96_str.strip() == "":
+        return None
+    
+    try:
+        sqrt_price_x96 = Decimal(sqrt_price_x96_str)
+        if sqrt_price_x96 == 0:
+            return Decimal(0)
+        
+        # محاسبه قیمت token0 بر حسب token1
+        price_t1_in_t0 = (sqrt_price_x96 / Q96) ** 2
+        if price_t1_in_t0 == 0:
+            return None
+        
+        price_t0_in_t1 = Decimal(1) / price_t1_in_t0
+        
+        # تنظیم اعشار
+        decimals_adjustment = Decimal(10) ** (TOKEN0_DECIMALS - TOKEN1_DECIMALS)
+        return price_t0_in_t1 / decimals_adjustment
+    except Exception as e:
+        print(f"Error converting sqrtPriceX96 (inverse): {e}")
+        return None
 
-def should_convert_ticks(column_name):
-    """Determine if a column contains tick values that need price conversion."""
-    column_lower = column_name.lower()
-    return 'tick' in column_lower
+def tick_to_price_token1_in_token0(tick_str: str) -> Decimal:
+    """
+    تبدیل تیک به قیمت token1 بر حسب token0
+    برای استخر USDC/WETH: قیمت WETH بر حسب USDC
+    """
+    if not tick_str or tick_str.strip() == "":
+        return None
+    
+    try:
+        tick = int(Decimal(tick_str))
+        price = TICK_BASE ** Decimal(tick)
+        
+        # تنظیم اعشار
+        decimals_adjustment = Decimal(10) ** (TOKEN1_DECIMALS - TOKEN0_DECIMALS)
+        return price / decimals_adjustment
+    except Exception as e:
+        print(f"Error converting tick: {e}")
+        return None
 
-def format_output_value(val):
-    """Format numeric values for CSV output."""
-    if val is None:
+def tick_to_price_token0_in_token1(tick_str: str) -> Decimal:
+    """
+    تبدیل تیک به قیمت token0 بر حسب token1
+    برای استخر USDC/WETH: قیمت USDC بر حسب WETH
+    """
+    if not tick_str or tick_str.strip() == "":
+        return None
+    
+    try:
+        tick = int(Decimal(tick_str))
+        price_t1_in_t0 = TICK_BASE ** Decimal(tick)
+        if price_t1_in_t0 == 0:
+            return None
+        
+        price_t0_in_t1 = Decimal(1) / price_t1_in_t0
+        
+        # تنظیم اعشار
+        decimals_adjustment = Decimal(10) ** (TOKEN0_DECIMALS - TOKEN1_DECIMALS)
+        return price_t0_in_t1 / decimals_adjustment
+    except Exception as e:
+        print(f"Error converting tick (inverse): {e}")
+        return None
+
+def format_decimal(value: Decimal, precision: int = 6) -> str:
+    """
+    فرمت دهی اعداد اعشاری برای نمایش بهتر
+    """
+    if value is None:
         return ""
-    if isinstance(val, (int, float)):
-        if val == 0:
-            return "0"
-        elif abs(val) < 0.000001:
-            return f"{val:.12e}"
-        else:
-            return f"{val:.8f}".rstrip('0').rstrip('.')
-    return str(val)
+    
+    if value == Decimal(0):
+        return "0"
+    
+    # نمایش علمی برای اعداد خیلی بزرگ یا کوچک
+    if abs(value) < Decimal('0.0001') or abs(value) > Decimal('1000000'):
+        return f"{value:.{precision}e}"
+    
+    # نمایش معمولی با حذف صفرهای غیرضروری
+    return f"{value:.{precision}f}".rstrip('0').rstrip('.') if '.' in f"{value}" else f"{value}"
 
-with open(input_file, 'r', encoding="utf-8") as infile, \
-     open(output_file, 'w', newline='', encoding="utf-8") as outfile:
-    reader = csv.DictReader(infile)
-    
-    # Create new fieldnames with human-readable columns
-    original_fields = reader.fieldnames
-    new_fields = []
-    for field in original_fields:
-        new_fields.append(field)  # Original column
-        new_fields.append(f"{field}_human_readable")  # Human readable column
-    
-    writer = csv.DictWriter(outfile, fieldnames=new_fields)
-    writer.writeheader()
-    
-    for row in reader:
-        new_row = {}
-        for field in original_fields:
-            value = row[field]
-            new_row[field] = value  # Keep original value
-            
-            # Skip non-numeric fields or empty values
-            if not value or value.lower() in ('', 'null', 'none', 'nan'):
-                new_row[f"{field}_human_readable"] = value
-                continue
-                
-            # Convert to human readable format based on field type
-            if should_convert_ticks(field):
-                # Convert tick to price
-                price = tick_to_price(value)
-                new_row[f"{field}_human_readable"] = format_output_value(price)
-            else:
-                # Try to convert as token amount first
-                decimals = get_token_decimals(field)
-                if decimals > 0:
-                    human_readable = format_decimal(value, decimals)
-                    new_row[f"{field}_human_readable"] = format_output_value(float(human_readable))
-                else:
-                    # Keep original value for non-token numeric fields
-                    new_row[f"{field}_human_readable"] = value
+def process_csv(input_path: str, output_path: str):
+    """
+    پردازش فایل CSV و ایجاد فایل خروجی با مقادیر تبدیل شده
+    """
+    with open(input_path, mode='r', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
         
-        writer.writerow(new_row)
+        # فیلدهای جدید برای خروجی
+        new_fields = fieldnames + [
+            'price_WETH_in_USDC',  # قیمت WETH بر حسب USDC (مثلاً 2634.12)
+            'price_USDC_in_WETH',  # قیمت USDC بر حسب WETH (مثلاً 0.00038)
+            'tick_to_price_WETH_in_USDC',  # قیمت WETH بر حسب USDC از تیک
+            'tick_to_price_USDC_in_WETH',  # قیمت USDC بر حسب WETH از تیک
+            'price_difference'  # اختلاف قیمت با قیمت خارجی
+        ]
+        
+        rows = []
+        for row in reader:
+            # محاسبه قیمت از sqrtPriceX96
+            sqrt_price = row.get('sqrtPriceX96_pool', '')
+            price_weth_in_usdc = sqrt_price_x96_to_price_token1_in_token0(sqrt_price)
+            price_usdc_in_weth = sqrt_price_x96_to_price_token0_in_token1(sqrt_price)
+            
+            row['price_WETH_in_USDC'] = format_decimal(price_weth_in_usdc) if price_weth_in_usdc is not None else ""
+            row['price_USDC_in_WETH'] = format_decimal(price_usdc_in_weth) if price_usdc_in_weth is not None else ""
+            
+            # محاسبه قیمت از تیک جاری
+            current_tick = row.get('currentTick_pool', '')
+            tick_price_weth_in_usdc = tick_to_price_token1_in_token0(current_tick)
+            tick_price_usdc_in_weth = tick_to_price_token0_in_token1(current_tick)
+            
+            row['tick_to_price_WETH_in_USDC'] = format_decimal(tick_price_weth_in_usdc) if tick_price_weth_in_usdc is not None else ""
+            row['tick_to_price_USDC_in_WETH'] = format_decimal(tick_price_usdc_in_weth) if tick_price_usdc_in_weth is not None else ""
+            
+            # محاسبه اختلاف قیمت
+            try:
+                external_price = Decimal(row.get('external_api_eth_price', 0))
+                if external_price != 0 and price_weth_in_usdc is not None:
+                    difference = (price_weth_in_usdc - external_price) / external_price * 100
+                    row['price_difference'] = f"{difference:.2f}%"
+                else:
+                    row['price_difference'] = ""
+            except:
+                row['price_difference'] = ""
+            
+            # تبدیل تیک‌های دیگر به قیمت
+            for tick_field in ['predictedTick_calculated', 'targetTickLower_calculated', 'targetTickUpper_calculated', 
+                              'finalTickLower_contract', 'finalTickUpper_contract']:
+                if tick_field in row and row[tick_field]:
+                    tick_value = row[tick_field]
+                    price = tick_to_price_token1_in_token0(tick_value)
+                    if price is not None:
+                        row[f"{tick_field}_price"] = format_decimal(price)
+            
+            rows.append(row)
+    
+    # ذخیره فایل خروجی
+    with open(output_path, mode='w', encoding='utf-8', newline='') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=new_fields, extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(rows)
 
-print(f"Converted file saved as {output_file}")
+# اجرای اسکریپت
+if __name__ == "__main__":
+    input_files = [
+        ('position_results_predictive.csv', 'predictive_converted.csv'),
+        ('position_results_baseline.csv', 'baseline_converted.csv')
+    ]
+    
+    for input_file, output_file in input_files:
+        print(f"Processing {input_file}...")
+        try:
+            process_csv(input_file, output_file)
+            print(f"Successfully converted to {output_file}")
+        except Exception as e:
+            print(f"Error processing {input_file}: {e}")

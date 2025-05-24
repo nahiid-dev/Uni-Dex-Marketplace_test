@@ -451,7 +451,14 @@ class PredictiveTest(LiquidityTestBase):
         return adjustment_call_success
     
     def save_metrics(self): 
-        self.metrics['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')        # Columns matching _reset_metrics in new version
+        self.metrics['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # تبدیل مقادیر Decimal به رشته با فرمت مناسب
+        if isinstance(self.metrics.get('actualPrice_pool'), Decimal):
+            self.metrics['actualPrice_pool'] = "0"
+            self.metrics['actualPrice_pool'] = f"{self.metrics['actualPrice_pool']:.6f}"
+        
+        # Columns matching _reset_metrics in new version
         columns = [
             'timestamp', 'contract_type', 'action_taken', 'tx_hash',
             'range_width_multiplier_setting',

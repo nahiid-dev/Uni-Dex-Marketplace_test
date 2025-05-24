@@ -566,9 +566,15 @@ class BaselineTest(LiquidityTestBase):
     
     def save_metrics(self): # According to your new file version
         self.metrics['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # تبدیل مقادیر Decimal به رشته با فرمت مناسب
+        if isinstance(self.metrics.get('actualPrice_pool'), Decimal):
+            self.metrics['actualPrice_pool'] = str(self.metrics['actualPrice_pool'])
+        
         # Columns match _reset_metrics in new version
         columns = [
-            'timestamp', 'contract_type', 'action_taken', 'tx_hash',            'range_width_multiplier_setting',
+            'timestamp', 'contract_type', 'action_taken', 'tx_hash',
+            'range_width_multiplier_setting',
             'external_api_eth_price', # This is usually null for baseline
             'actualPrice_pool', 'sqrtPriceX96_pool', 'currentTick_pool',
             'targetTickLower_offchain', 'targetTickUpper_offchain',
@@ -586,7 +592,7 @@ class BaselineTest(LiquidityTestBase):
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
             file_exists = RESULTS_FILE.is_file()
             row_data = {col: self.metrics.get(col) for col in columns}
-
+    
             with open(RESULTS_FILE, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=columns, extrasaction='ignore')
                 if not file_exists or os.path.getsize(RESULTS_FILE) == 0:
