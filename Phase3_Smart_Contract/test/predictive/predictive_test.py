@@ -222,7 +222,7 @@ class PredictiveTest(LiquidityTestBase):
             price_decimal = Decimal(str(price))
             # Convert price from token1/token0 to token0/token1 (ETH/USDC to USDC/ETH)
             # and adjust for decimals
-            effective_sqrt_price_arg = price_decimal * (Decimal(10)**(self.token0_decimals - self.token1_decimals))
+            effective_sqrt_price_arg = (Decimal(1) / price_decimal) * (Decimal(10)**(self.token1_decimals - self.token0_decimals))
             
             if effective_sqrt_price_arg <= 0:
                 logger.error(f"Argument for sqrt in tick calculation is non-positive: {effective_sqrt_price_arg} (price: {price}, dec0: {self.token0_decimals}, dec1: {self.token1_decimals})")
