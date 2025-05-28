@@ -12,7 +12,7 @@ async function main() {
     const WETH_MAINNET = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
     const USDC_MAINNET = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Mainnet USDC (6 decimals)
     const POOL_FEE = 500; // 0.05% fee tier for WETH/USDC (as per your file)
-    const INITIAL_RANGE_WIDTH_MULTIPLIER = 50; // Default or desired value
+    const INITIAL_RANGE_WIDTH_MULTIPLIER = 100; // Default or desired value
 
     const [deployer] = await hre.ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);

@@ -1,37 +1,80 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-import seaborn as sns
+import seaborn as sns  
 import numpy as np
-import io
+from pathlib import Path
+import sys # To stop the program in case of an error
 
-# --- 1. Data Loading ---
-# !! IMPORTANT !!
-# Replace these string IOs with pd.read_csv("your_predictive_data.csv")
-# and pd.read_csv("your_baseline_data.csv") when using your real data.
+# --- 1. Data Loading (Modified with Parent Directory) ---
 
-predictive_csv_data = """timestamp,contract_type,predictedPrice_api,currentTick_pool,actualPrice_pool,finalTickLower_contract,finalTickUpper_contract,liquidity_contract,gas_cost_eth
-2025-05-27 11:37:28,Predictive,2449.25,197537,2639.19,198030,198540,1584851444360467,0.000637
-2025-05-27 15:37:30,Predictive,2463.81,197517,2644.58,197970,198480,1580104251732220,0.000718
-2025-05-27 19:37:32,Predictive,2478.88,197430,2667.76,197910,198420,1575371278630938,0.001003
-2025-05-27 23:37:34,Predictive,2680.50,197480,2675.00,197200,197710,1570000000000000,0.000850
-2025-05-28 03:37:36,Predictive,2695.00,197550,2690.10,197300,197810,1565000000000000,0.000900
-2025-05-28 07:37:38,Predictive,2710.00,197600,2705.50,197350,197860,1560000000000000,0.000920
-2025-05-28 11:37:40,Predictive,2690.00,197500,2685.00,197250,197760,1555000000000000,0.000880
-"""
+PREDICTIVE_FILE_NAME = "position_results_predictive.csv"
+BASELINE_FILE_NAME = "position_results_baseline.csv"
 
-baseline_csv_data = """timestamp,contract_type,currentTick_pool,actualPrice_pool,finalTickLower_contract,finalTickUpper_contract,finalLiquidity_contract,gas_cost_eth
-2025-05-27 11:37:36,Baseline,197537,2639.19,197280,197780,3234462389408236,0.000614
-2025-05-27 15:37:38,Baseline,197517,2644.58,197260,197760,3225583254921866,0.000629
-2025-05-27 19:37:40,Baseline,197430,2667.76,197180,197680,3118546652003028,0.000767
-2025-05-27 23:37:42,Baseline,197480,2675.00,197230,197730,3100000000000000,0.000750
-2025-05-28 03:37:44,Baseline,197550,2690.10,197300,197800,3090000000000000,0.000780
-2025-05-28 07:37:46,Baseline,197600,2705.50,197350,197850,3080000000000000,0.000790
-2025-05-28 11:37:48,Baseline,197500,2685.00,197250,197750,3070000000000000,0.000770
-"""
+try:
+    # Get the full path of the currently running script
+    script_path = Path(__file__).resolve()
+    # Get the directory where the script is located (e.g., 'analysis')
+    script_dir = script_path.parent
+    # !! Important !! Go to the parent directory (one level up) to find CSVs
+    csv_dir = script_dir.parent
 
-df_pred = pd.read_csv(io.StringIO(predictive_csv_data))
-df_base = pd.read_csv(io.StringIO(baseline_csv_data))
+except NameError:
+    # If __file__ is not defined (e.g., in Jupyter or interactive console),
+    # use the current working directory as the script directory
+    # and its parent as the CSV directory.
+    # !! Note !! In this case, ensure you are running from the 'analysis' folder.
+    print("Warning: __file__ variable not found. Using the current working directory.")
+    script_dir = Path('.').resolve()
+    csv_dir = script_dir.parent # Go up one level from the current dir
+    print(f"Assumed script path: {script_dir}")
+
+
+# Construct the full path to the CSV files using the parent directory path
+predictive_path = csv_dir / PREDICTIVE_FILE_NAME
+baseline_path = csv_dir / BASELINE_FILE_NAME
+
+print(f"Script path: {script_dir}")
+print(f"CSV search path: {csv_dir}")
+print(f"Attempting to read file: {predictive_path}")
+print(f"Attempting to read file: {baseline_path}")
+
+# Use try-except to handle potential FileNotFoundError
+try:
+    # Read the CSV files directly using the full path
+    df_pred = pd.read_csv(predictive_path)
+    df_base = pd.read_csv(baseline_path)
+    print("✅ Files loaded successfully.")
+
+except FileNotFoundError:
+    print("❌ Error: One or both CSV files were not found.")
+    print(f"   Please ensure that the file '{PREDICTIVE_FILE_NAME}' exists at path '{predictive_path}'.")
+    print(f"   And that the file '{BASELINE_FILE_NAME}' exists at path '{baseline_path}'.")
+    sys.exit(1) # Stop execution with an error code
+except Exception as e:
+    print(f"❌ An unexpected error occurred while reading the files: {e}")
+    sys.exit(1) # Stop execution with an error code
+
+# --- 2. Data Preprocessing & Style ---
+# ... Rest of your code continues here ...
+def preprocess(df):
+    """Preprocesses the DataFrame: sets datetime, converts numeric, handles NaNs."""
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    numeric_cols = ['predictedPrice_api', 'actualPrice_pool', 'currentTick_pool',
+                    'finalTickLower_contract', 'finalTickUpper_contract',
+                    'gas_cost_eth', 'liquidity_contract', 'finalLiquidity_contract']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    if 'liquidity_contract' not in df.columns and 'finalLiquidity_contract' in df.columns:
+        df['liquidity_contract'] = df['finalLiquidity_contract']
+    df = df.fillna(0)
+    df = df.sort_values('timestamp').reset_index(drop=True)
+    return df
+
+df_pred = preprocess(df_pred)
+df_base = preprocess(df_base)
+
 
 # --- 2. Data Preprocessing & Style ---
 def preprocess(df):
