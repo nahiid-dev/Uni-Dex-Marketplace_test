@@ -1,222 +1,178 @@
-# Summary of Installed Package Versions on Windows 10
-This document provides a summary of the package versions used in the project and their status.
+# 📊 Financial Time Series Forecasting using LSTM & GRU
 
-## Installed Package Versions
-
-### Python
-- **Version**: 3.9.0
-
-### TensorFlow
-- **Version**: 2.12.0
-- **Summary**: TensorFlow is an open-source framework for machine learning.
-
-### NumPy
-- **Version**: 1.23.5
-- **Summary**: NumPy is a fundamental library for array computations in Python.
-
-### Keras
-- **Version**: 2.12.0 (Part of TensorFlow)
-- **Summary**: Keras is an API for building and training deep learning models.
-
-### SciPy
-- **Version**: 1.13.1
-- **Summary**: SciPy is a library for scientific and numerical computations.
-
-### Pandas
-- **Version**: 2.2.3
-- **Summary**: Pandas is a library for data manipulation and analysis.
-
-### Matplotlib
-- **Version**: (To be installed as needed for data visualization)
-- **Summary**: Matplotlib is a library for data plotting and visualization.
-
-## Important Notes
-
-- **Version Conflict**: Note that NumPy version 2.0.2 is not compatible with TensorFlow version 2.12.0. It is recommended to downgrade NumPy to version 1.23.5 for compatibility with TensorFlow.
-- **Virtual Environment**: Always ensure that you are working in a virtual environment (`myenv`) to avoid conflicts with other packages.
--------------------------------------------------------------
-# Work Report: Financial Time Series Prediction with LSTM and GRU Models
-
-**Prepared by [Nahid Shahab] on [2025-01-28]**
+**Author: Nahid Shahab**
+**Date: 2025-01-28**
 
 ## 1. Introduction
 
-The objective of this project is to predict financial time series data using advanced deep learning techniques. The focus is on leveraging Long Short-Term Memory (LSTM) and Gated Recurrent Unit (GRU) networks to capture the temporal dependencies in the data. The project specifically deals with cryptocurrency price prediction, using historical data to forecast future trends. Python, TensorFlow, and related libraries were employed to implement the models.
+This project provides a comprehensive framework for forecasting financial time series, with a specific focus on cryptocurrency prices, using state-of-the-art deep learning models: Long Short-Term Memory (LSTM) and Gated Recurrent Unit (GRU) networks. Financial markets exhibit complex, non-linear, and often noisy patterns. LSTMs and GRUs are specifically designed to capture long-range temporal dependencies, making them suitable candidates for this task.
+
+The primary objective is to develop, train, and evaluate these models to predict future price movements based on historical data. This involves several key stages: data acquisition and preprocessing, feature engineering with technical indicators, model building, robust training strategies, and thorough evaluation, including crucial steps to avoid common pitfalls like data leakage.
+
+This document serves as a guide to understanding the project's workflow, architecture, implementation details, setup, usage, and results.
 
 ---
 
-## 2. Data Loading and Preprocessing
+## 2. Project Workflow
 
-### 2.1 Data Loading
-- The historical cryptocurrency price data was loaded from a CSV file using Pandas.
-- Relevant columns (`open_time`, `open`, `high`, `low`, `close`, and `volume`) were extracted.
+The project follows these key steps:
 
-### 2.2 Data Transformation
-- The `open_time` column was converted to datetime format and set as the index for better time series handling.
-- Data was resampled to different timeframes (e.g., hourly, 4-hourly, daily) to accommodate different analysis resolutions.
-
-### 2.3 Feature Engineering
-- Technical indicators were added to enrich the feature set:
-  - **Simple Moving Average (SMA):** Calculated using a rolling window.
-  - **Relative Strength Index (RSI):** Computed to capture momentum in the price movements.
-  - **Bollinger Bands:** Added to indicate price volatility.
-
----
-
-## 3. Data Normalization and Sequence Creation
-
-### 3.1 Normalization
-- All features were normalized using `MinMaxScaler` from the `sklearn` library to scale values between 0 and 1, ensuring stable model training.
-
-### 3.2 Sequence Creation
-- Historical sequences of 50 time steps were created to train the models.
-- A sliding window approach was used to form input-output pairs where each sequence corresponds to the next time step's prediction.
+1.  **Data Loading:** Read historical OHLCV data from a CSV file.
+2.  **Preprocessing:** Convert time formats, set index, and handle missing values.
+3.  **Resampling:** Adjust data to desired timeframes (1H, 4H, 1D).
+4.  **Feature Engineering:** Calculate and add technical indicators (SMA, RSI, Bollinger Bands, ATR).
+5.  **Data Splitting:** Divide the data chronologically into Training (80%), Validation (10%), and Testing (10%) sets.
+6.  **Normalization:** Scale features between 0 and 1 using `MinMaxScaler`, **fitting only on the training set** to prevent data leakage.
+7.  **Sequence Creation:** Transform data into sequences suitable for RNN input.
+8.  **Model Building:** Define LSTM and GRU model architectures.
+9.  **Model Training:** Train both models using training and validation sets, employing callbacks like Early Stopping, ReduceLROnPlateau, and ModelCheckpoint.
+10. **Evaluation:** Assess model performance on the test set using MSE, RMSE, MAE, and R².
+11. **Visualization:** Plot results and comparison metrics.
 
 ---
 
-## 4. Model Architecture
+## 3. Data
 
-### 4.1 LSTM Model
-- **Layers:**
-  - Two LSTM layers with 64 units each and ReLU activation.
-  - Dropout layers (rate = 0.2) to mitigate overfitting.
-  - Dense layers for final predictions.
-- The model was compiled with the Adam optimizer and Mean Squared Error (MSE) loss function.
-
-### 4.2 GRU Model
-- **Layers:**
-  - Two GRU layers with 64 units each and ReLU activation.
-  - Dropout layers (rate = 0.2).
-  - Dense layers for output generation.
-- Similar compilation settings as the LSTM model.
+*   **Source:** Historical OHLCV (Open, High, Low, Close, Volume) data, typically sourced from cryptocurrency exchanges like Binance.
+*   **Format:** Requires a CSV file. Ensure it contains at least these columns: `open_time`, `open`, `high`, `low`, `close`, `volume`.
+*   **Setup:** You must provide your own data file. Update the `file_path` variable in the `main()` function within the script to point to your CSV file's location (e.g., within your mounted Google Drive if using Colab).
 
 ---
 
-## 5. Model Training and Evaluation
+## 4. Preprocessing & Feature Engineering
 
-### 5.1 Training Process
-- Data was split into training (80%) and testing (20%) sets.
-- Models were trained using Early Stopping to monitor validation loss and halt training when no improvement was observed.
-- Batch size and epochs were tuned for optimal performance.
+### 4.1 Data Loading & Initial Prep (`load_and_preprocess_data`)
 
-### 5.2 Evaluation Metrics
-The models were evaluated on the testing set using the following metrics:
-- **Mean Squared Error (MSE):** Measures the average squared difference between predictions and actual values.
-- **Root Mean Squared Error (RMSE):** Square root of MSE for interpretability.
-- **Mean Absolute Error (MAE):** Average absolute difference between predictions and actual values.
-- **R-squared (R²):** Indicates the proportion of variance explained by the model.
+*   Reads the CSV using Pandas.
+*   Converts the `open_time` column to Python's `datetime` objects.
+*   Sets `open_time` as the DataFrame index, crucial for time-based operations.
+*   Selects the core OHLCV columns.
+*   Drops any rows with missing data.
 
----
+### 4.2 Resampling (`resample_data`)
 
-## 6. Results and Analysis
+*   Aggregates data into the specified timeframes ('1h', '4h', '1d').
+*   Uses `first` for 'open', `max` for 'high', `min` for 'low', `last` for 'close', and `sum` for 'volume'. This ensures each new candle correctly represents its period.
 
-### 6.1 Quantitative Results
-Comparison of evaluation metrics and next predicted prices for different timeframes:
+### 4.3 Technical Indicators (`add_technical_indicators`)
 
-#### 1 Hour:
-- **Model: LSTM**
-  - MSE: 52,597,412.63
-  - RMSE: 7,252.41
-  - MAE: 6,706.79
-  - R²: 0.86
-  - Next Predicted Price: 84,193.25
-- **Model: GRU**
-  - MSE: 97,053,193.73
-  - RMSE: 9,851.56
-  - MAE: 8,549.18
-  - R²: 0.75
-  - Next Predicted Price: 76,525.74
+*   Adds features to help the model understand market dynamics beyond raw price:
+    *   **SMA (14):** Simple Moving Average (14-period) to identify trends.
+    *   **RSI (14):** Relative Strength Index (14-period) to gauge momentum.
+    *   **Bollinger Upper (20, 2):** Upper Bollinger Band (20-period, 2 std dev) to assess volatility.
+    *   **ATR (14):** Average True Range (14-period) to measure volatility directly.
+*   Drops rows with `NaN` values, which are inevitably created at the beginning when calculating rolling indicators.
 
-#### 4 Hours:
-- **Model: LSTM**
-  - MSE: 5,087,262.81
-  - RMSE: 2,255.50
-  - MAE: 1,669.39
-  - R²: 0.99
-  - Next Predicted Price: 98,266.94
-- **Model: GRU**
-  - MSE: 49,097,389.30
-  - RMSE: 7,006.95
-  - MAE: 6,526.16
-  - R²: 0.87
-  - Next Predicted Price: 84,181.45
+### 4.4 Data Splitting & Normalization
 
-#### 1 Day:
-- **Model: LSTM**
-  - MSE: 11,292,165.31
-  - RMSE: 3,360.38
-  - MAE: 2,412.14
-  - R²: 0.97
-  - Next Predicted Price: 96,741.01
-- **Model: GRU**
-  - MSE: 14,843,537.47
-  - RMSE: 3,852.73
-  - MAE: 2,776.86
-  - R²: 0.96
-  - Next Predicted Price: 94,420.26
+*   **Splitting First:** The data (features) is split *before* scaling. This is **critical** to prevent data leakage.
+*   **MinMaxScaler:** Features are scaled to [0, 1]. The scaler is `fit` **only** on the training data and then used to `transform` all three sets.
 
-### 6.2 Visualization
-- Plots were generated to compare predicted vs. actual prices for different timeframes.
-- Loss curves for training and validation were analyzed to ensure convergence.
+### 4.5 Sequence Creation (`create_sequences`)
 
-### 6.3 Model Comparison
-- LSTM demonstrated better performance on long-term dependencies, while GRU was faster to train and computationally efficient.
+*   Data is transformed into sequences of length 50 (`seq_length=50`). `X` contains the input sequences, and `y` contains the target 'close' price for the next step.
 
 ---
 
-## 7. Conclusion
+## 5. Model Architecture (`build_lstm_model`, `build_gru_model`)
 
-This project successfully implemented LSTM and GRU models for cryptocurrency price prediction. Key takeaways include:
-- LSTM performed better for capturing long-term dependencies.
-- Feature engineering significantly improved model accuracy.
-- Early Stopping and dropout effectively mitigated overfitting.
-
-**Future Work:**
-- Experiment with hybrid models combining LSTM and GRU.
-- Incorporate external factors (e.g., market news) as additional features.
-- Optimize hyperparameters using grid search or Bayesian optimization.
+*   **Type:** `Sequential` Keras models.
+*   **Recurrent Layers (LSTM/GRU):** Two layers with 64 units each and `tanh` activation.
+*   **Dropout (0.2):** Applied after each recurrent layer for regularization.
+*   **Dense Layer:** 32 units, `tanh` activation.
+*   **Output Layer (Dense):** 1 unit (linear activation).
+*   **Compilation:** `optimizer='adam'`, `loss='mse'`.
 
 ---
 
-## 8. Appendix
+## 6. Model Training (`train_model`)
 
-### Sample Code Snippet
+*   Uses `model.fit()` with `epochs=100` and `batch_size=64`.
+*   **Callbacks:**
+    *   **`EarlyStopping(patience=10, restore_best_weights=True)`:** Stops training early and keeps the best weights.
+    *   **`ReduceLROnPlateau(patience=5, factor=0.5)`:** Reduces learning rate if training plateaus.
+    *   **`ModelCheckpoint(save_best_only=True)`:** Saves the best performing model to disk.
+
+---
+
+## 7. Evaluation (`evaluate_model`)
+
+*   Rescales predictions and actuals back to the original price range.
+*   Calculates **MSE**, **RMSE**, **MAE**, and **R²**.
+
+---
+
+## 8. Installation & Setup
+
+### 8.1 Requirements:
+
+*   Python: 3.9.0
+*   TensorFlow: 2.12.0
+*   Keras: 2.12.0 (Part of TensorFlow)
+*   NumPy: 1.23.5 (*Note: TensorFlow 2.12 needs NumPy < 2.0*)
+*   Pandas: 2.2.3
+*   SciPy: 1.13.1
+*   Matplotlib: 3.x.x
+*   Scikit-learn: 1.x.x
+*   Joblib: 1.x.x
+
+### 8.2 Installation:
+
+```bash
+# Create & activate virtual environment
+python -m venv myenv
+source myenv/bin/activate # Linux/macOS
+# myenv\Scripts\activate # Windows
+
+# Install packages
+pip install tensorflow==2.12.0 pandas==2.2.3 numpy==1.23.5 matplotlib scikit-learn joblib scipy==1.13.1
+
+### 8.3 Google Colab:
+
+Most libraries are pre-installed.
+You only need to mount your Google Drive to access the data file:
 
 ```python
-# Example of LSTM model implementation
-# Function to build the LSTM model
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dropout, Dense
-from tensorflow.keras.callbacks import EarlyStopping
-
-def build_lstm_model(input_shape):
-    lstm_model = Sequential([
-        LSTM(64, activation='relu', return_sequences=True, input_shape=input_shape),
-        Dropout(0.2),
-        LSTM(64, activation='relu', return_sequences=False),
-        Dropout(0.2),
-        Dense(32, activation='relu'),
-        Dense(1)
-    ])
-    lstm_model.compile(optimizer='adam', loss='mse')
-    return lstm_model
-
-# Function to train the model
-def train_model(model, X_train, y_train, X_val, y_val, epochs=100, batch_size=32):
-    early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=epochs,
-        batch_size=batch_size,
-        callbacks=[early_stopping],
-        verbose=1
-    )
-
-    return model, history
+from google.colab import drive
+drive.mount('/content/drive')
 ```
+9. How to Run
+Clone/download the repository/script.
+Set up your environment and install packages (or use Google Colab).
+Ensure your data CSV file is available.
+Edit the file_path in main() to match your data file location (especially important in Colab, e.g., /content/drive/MyDrive/your_file.csv).
+Run the script: python your_script_name.py (or run the cells in your Colab notebook).
+Monitor the console/Colab output for progress and results.
+Check the working directory (/content/ in Colab) for saved models (.keras), scalers (.pkl), and plots (.png). Remember to save these from Colab if you need them permanently.
+10. Results & Interpretation (Based on Latest Run)
+10.1 Quantitative Results:
+Timeframe	Model	MSE	RMSE	MAE	R²	Next Predicted Price
+1 Hour	LSTM	937.71	30.62	21.18	1.00	2746.63
+GRU	846.23	29.09	20.47	1.00	2726.05
+4 Hours	LSTM	4061.40	63.73	46.08	0.99	2665.44
+GRU	3263.49	57.13	41.11	0.99	2708.92
+1 Day	LSTM	21293.56	145.92	108.41	0.96	2629.20
+GRU	19996.03	141.41	104.88	0.96	2610.98
 
----
+Export to Sheets
+10.2 Critical Interpretation Note:
+The R² values presented (1.00, 0.99, 0.96) are extremely high and highly suspect for financial forecasting, even after addressing the initial normalization leak. Such values strongly suggest either:
 
-This document provides a comprehensive overview of the project, detailing each step and its outcomes.
+A remaining data leakage issue or flaw in the evaluation process.
+The model is primarily learning a very strong short-term persistence (Naive Forecast).
+It is IMPERATIVE to investigate these R² values further and, most importantly, compare these RMSE/MAE results against a Naive Forecast to determine if these complex models provide any meaningful advantage. Trusting these results without further validation and baseline comparison is not recommended.
+
+10.3 Initial Analysis (Based solely on these numbers):
+Based strictly on these numbers (and acknowledging the R² warning), the GRU model appears to outperform the LSTM model across all timeframes, showing slightly lower errors.
+
+11. Conclusion & Future Work
+This project demonstrates the application of LSTM and GRU models for financial forecasting, highlighting the importance of proper methodology. While the models show high R² values, these require significant critical review and further investigation before any conclusions about predictive power can be drawn. The comparison suggests GRU might have a slight edge in this run.
+
+Future Directions:
+
+Crucially: Implement and compare with a Naive Forecast.
+Investigate potential sources of data leakage or evaluation issues.
+Rigorous hyperparameter optimization.
+Exploration of advanced architectures (Attention, Transformers).
+Inclusion of external features (news, sentiment).
+Deployment and real-world performance tracking (only after robust validation).
