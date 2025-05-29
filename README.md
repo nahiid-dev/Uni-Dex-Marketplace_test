@@ -42,7 +42,86 @@ Phase3_Smart_Contract/
 ```
 
 ---
+graph TD
+    subgraph Phase1_Data_Collection [Phase 1 Data Collection]
+        direction LR
+        P1_START[Phase 1 Start Define Parameters]
+        P1_PROCESS[Download & Combine Annual Binance Data]
+        P1_END[Phase 1 End Comprehensive CSV File Ready]
 
+        P1_START --> P1_PROCESS --> P1_END
+    end
+
+    subgraph Phase2_PredictionModel [Phase 2 Prediction Model Building & Training]
+        direction LR
+        P2_START[Phase 2 Start Read Comprehensive CSV from Phase 1]
+        P2_PROCESS[Preprocess Feature Engineering & Data Prep]
+        P2_TRAIN_EVAL[Build Train & Evaluate LSTM & GRU Models]
+        P2_SAVE[Save Best Model & Scaler]
+        P2_API[Prepare API for Price Prediction]
+        P2_END[Phase 2 End Trained Model & API Ready]
+
+        P2_START --> P2_PROCESS --> P2_TRAIN_EVAL --> P2_SAVE --> P2_API --> P2_END
+    end
+
+    subgraph Phase3_SmartContract_And_Analysis [Phase 3 Smart Contract Testing & Results Analysis]
+        direction TB
+        P3_ROOT[Start run_fork_test_sh execution]
+
+        subgraph P3_A_EnvironmentSetup [Test Environment Setup]
+            direction LR
+            P3_A1[1 Load Environment Variables from dot_env]
+            P3_A2[2 Start Hardhat Node with Fork]
+            P3_A3[3 Run fund_my_wallet_py to Fund Deployer]
+            
+            P3_A1 --> P3_A2 --> P3_A3
+        end
+
+        subgraph P3_B_ContractDeployment [Contract Deployment]
+            direction LR
+            P3_B1[Deploy PredictiveLiquidityManager & Save Address to JSON]
+            P3_B2[Deploy BaselineMinimal & Save Address to JSON]
+        end
+        
+        subgraph P3_C_PythonExecution [Python Tests Execution]
+            direction TB
+            P3_C1[Run predictive_test_py]
+            P3_C1_ACTION[Interact with Predictive Contract using Model API & Save Results to CSV]
+            
+            P3_C2[Run baseline_test_py]
+            P3_C2_ACTION[Interact with Baseline Contract & Save Results to CSV]
+
+            P3_C1 --> P3_C1_ACTION
+            P3_C2 --> P3_C2_ACTION
+        end
+
+        subgraph P3_D_ResultsAnalysis [Results Analysis with strategy_analyzer]
+            direction LR
+            P3_D1[Read Results CSV Files]
+            P3_D2[Calculate Metrics P&L & IL]
+            P3_D3[Create Summary Table & Plots]
+            P3_D4[Save Analysis Outputs]
+
+            P3_D1 --> P3_D2 --> P3_D3 --> P3_D4
+        end
+
+        P3_ROOT --> P3_A_EnvironmentSetup
+        P3_A_EnvironmentSetup --> P3_B_ContractDeployment
+        P3_B_ContractDeployment --> P3_B1
+        P3_B_ContractDeployment --> P3_B2
+        
+        P3_B1 --> P3_C1
+        P3_B2 --> P3_C2
+        
+        P3_C1_ACTION --> P3_D_ResultsAnalysis
+        P3_C2_ACTION --> P3_D_ResultsAnalysis
+    end
+
+    P1_END --> P2_START
+    P2_API --> P3_C1  
+
+
+    
 ## 🔁 Execution Workflow
 
 ### 1. Run `run_fork_test.sh`
