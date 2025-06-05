@@ -826,10 +826,7 @@ class PredictiveTest(LiquidityTestBase):
             'amount1_provided_to_mint',
             'fees_collected_token0', 
             'fees_collected_token1', 
-            'gas_used', 'gas_cost_eth', 'error_message',
-            # New fields added at the end
-            'fees_collected_token0_via_collect_only', 
-            'fees_collected_token1_via_collect_only'
+            'gas_used', 'gas_cost_eth', 'error_message'        
         ]
         
         row_data = {}
