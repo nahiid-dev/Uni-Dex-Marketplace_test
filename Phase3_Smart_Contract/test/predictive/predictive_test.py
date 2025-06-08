@@ -82,7 +82,7 @@ class PredictiveTest(LiquidityTestBase):
             "TX_SUCCESS_ADJUSTED_FINAL": "tx_success_adjusted_final",
             "SWAP_FOR_FEES_FAILED": "swap_for_fees_failed",
             "FEES_COLLECT_ONLY_SUCCESS": "fees_collect_only_success", # New state
-            "FEES_COLLECT_ONLY_FAILED": "fees_collect_only_failed"    # New state
+            "FEES_COLLECT_ONLY_FAILED": "fees_collect_only_failed"  # New state
         }
         super().__init__(contract_address, "PredictiveLiquidityManager")
         self.metrics = self._reset_metrics() # Ensure metrics are reset with Predictive-specific defaults
@@ -104,7 +104,7 @@ class PredictiveTest(LiquidityTestBase):
 
     def _reset_metrics(self):
         # Based on your original _reset_metrics from last_test_code.txt
-        base_metrics = super()._reset_metrics() 
+        base_metrics = super()._reset_metrics()
         predictive_metrics = {
             'contract_type': 'Predictive',
             'action_taken': self.ACTION_STATES["INIT"],
@@ -117,12 +117,12 @@ class PredictiveTest(LiquidityTestBase):
         final_metrics = {**base_metrics, **predictive_metrics}
         original_keys_defaults = {
             'timestamp': None, 'tx_hash': None, 'range_width_multiplier_setting': None,
-            'external_api_eth_price': None, 'sqrtPriceX96_pool': 0, 'currentTick_pool': 0, 
-            'targetTickLower_calculated': 0, 'targetTickUpper_calculated': 0, 
+            'external_api_eth_price': None, 'sqrtPriceX96_pool': 0, 'currentTick_pool': 0,
+            'targetTickLower_calculated': 0, 'targetTickUpper_calculated': 0,
             'initial_contract_balance_token0': None, 'initial_contract_balance_token1': None,
-            'finalTickLower_contract': 0, 'finalTickUpper_contract': 0, 'liquidity_contract': 0, 
+            'finalTickLower_contract': 0, 'finalTickUpper_contract': 0, 'liquidity_contract': 0,
             'amount0_provided_to_mint': None, 'amount1_provided_to_mint': None,
-            'fees_collected_token0': None, 'fees_collected_token1': None, 
+            'fees_collected_token0': None, 'fees_collected_token1': None,
             'gas_used': 0, 'gas_cost_eth': 0.0, 'error_message': ""
         }
         for key, default_value in original_keys_defaults.items():
@@ -139,7 +139,9 @@ class PredictiveTest(LiquidityTestBase):
         try:
             if not web3_utils.w3 or not web3_utils.w3.is_connected():
                 logger.error("web3_utils.w3 not available in PredictiveTest setup after base.setup()")
-                self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]; self.metrics['error_message'] = "web3_utils.w3 unavailable post base setup"; return False
+                self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
+                self.metrics['error_message'] = "web3_utils.w3 unavailable post base setup"
+                return False
 
             try:
                 self.nft_position_manager_address = Web3.to_checksum_address(
@@ -169,7 +171,10 @@ class PredictiveTest(LiquidityTestBase):
 
             factory_address = self.contract.functions.factory().call()
             factory_contract = get_contract(factory_address, "IUniswapV3Factory")
-            if not factory_contract: self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]; self.metrics['error_message'] = "Factory contract not found"; return False
+            if not factory_contract:
+                self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
+                self.metrics['error_message'] = "Factory contract not found"
+                return False
 
             fee = self.contract.functions.fee().call()
             self.pool_address = factory_contract.functions.getPool(self.token0, self.token1, fee).call()
@@ -181,7 +186,10 @@ class PredictiveTest(LiquidityTestBase):
                 return False
                 
             self.pool_contract = get_contract(self.pool_address, "IUniswapV3Pool")
-            if not self.pool_contract: self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]; self.metrics['error_message'] = "Pool contract object could not be created"; return False
+            if not self.pool_contract:
+                self.metrics['action_taken'] = self.ACTION_STATES["SETUP_FAILED"]
+                self.metrics['error_message'] = "Pool contract object could not be created"
+                return False
 
             logger.info(f"Predictive Pool contract initialized at {self.pool_address}")
             
@@ -254,7 +262,7 @@ class PredictiveTest(LiquidityTestBase):
             self.metrics['action_taken'] = self.ACTION_STATES["API_FAILED"]
             self.metrics['error_message'] = f"API Request Error: {str(e)}"
             return None
-        except (ValueError, KeyError) as e: 
+        except (ValueError, KeyError) as e:
             data_for_log = 'N/A'
             if 'data' in locals(): data_for_log = data
             logger.exception(f"Error processing API response from {LSTM_API_URL}. Data: {data_for_log}. Error: {e}")
@@ -317,7 +325,7 @@ class PredictiveTest(LiquidityTestBase):
                 self.metrics['currentTick_pool'] = current_tick_pool
                 self.metrics['actualPrice_pool'] = self.sqrt_price_x96_to_price_token0_in_token1(str(sqrt_price_x96_pool))
             else:
-                logger.warning("Pool contract not available for metrics update (pool_and_position).") 
+                logger.warning("Pool contract not available for metrics update (pool_and_position).")
 
             position_info = self.get_position_info()
             if position_info:
@@ -327,11 +335,11 @@ class PredictiveTest(LiquidityTestBase):
 
                 # Update currentXXX_contract fields if they exist in metrics dictionary
                 if 'currentTickLower_contract' in self.metrics:
-                     self.metrics['currentTickLower_contract'] = position_info.get('tickLower', self.metrics.get('currentTickLower_contract',0))
+                        self.metrics['currentTickLower_contract'] = position_info.get('tickLower', self.metrics.get('currentTickLower_contract',0))
                 if 'currentTickUpper_contract' in self.metrics:
-                     self.metrics['currentTickUpper_contract'] = position_info.get('tickUpper', self.metrics.get('currentTickUpper_contract',0))
+                        self.metrics['currentTickUpper_contract'] = position_info.get('tickUpper', self.metrics.get('currentTickUpper_contract',0))
                 if 'currentLiquidity_contract' in self.metrics:
-                     self.metrics['currentLiquidity_contract'] = position_info.get('liquidity', self.metrics.get('currentLiquidity_contract',0))
+                        self.metrics['currentLiquidity_contract'] = position_info.get('liquidity', self.metrics.get('currentLiquidity_contract',0))
 
                 if final_update or (is_active and position_info.get('liquidity', 0) > 0):
                     self.metrics['finalTickLower_contract'] = position_info.get('tickLower', 0)
@@ -356,14 +364,14 @@ class PredictiveTest(LiquidityTestBase):
             logger.error("Token decimals not available for sqrt_price_x96_to_price_token0_in_token1 (Predictive)")
             return Decimal("-1")
 
-        price_t1_in_t0 = (sqrt_price_x96 / TWO_POW_96)**2 
+        price_t1_in_t0 = (sqrt_price_x96 / TWO_POW_96)**2
         if price_t1_in_t0 == Decimal(0):
             return Decimal("inf") if sqrt_price_x96 != Decimal(0) else Decimal(0)
         
         price_t0_in_t1 = Decimal(1) / price_t1_in_t0
         decimals_adjustment = Decimal(10)**(self.token0_decimals - self.token1_decimals)
-        if decimals_adjustment == Decimal(0): 
-            return Decimal("-1") 
+        if decimals_adjustment == Decimal(0):
+            return Decimal("-1")
 
         return price_t0_in_t1 / decimals_adjustment
 
@@ -391,7 +399,7 @@ class PredictiveTest(LiquidityTestBase):
             logger.warning("TokenManagerOptimized address not set for Predictive. Skipping swap for fees.")
             return False
         
-        if not self.token_manager_contract: 
+        if not self.token_manager_contract:
             self.token_manager_contract = web3_utils.get_contract(self.token_manager_optimized_address, "TokenOperationsManagerOptimized")
             if not self.token_manager_contract:
                 logger.error("Failed to get TokenOperationsManagerOptimized contract instance for Predictive.")
@@ -424,7 +432,7 @@ class PredictiveTest(LiquidityTestBase):
                 return False
             logger.info(f"TokenManagerOptimized approved for Predictive. Tx: {receipt_approve.transactionHash.hex()}")
             
-            current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address) 
+            current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address)
             logger.info(f"Calling swap on TokenManagerOptimized for Predictive: {swap_amount_readable} {swap_token_in_addr} -> {swap_token_out_addr}, fee {pool_fee_for_swap}...")
             swap_tx_params = {'from': funding_account.address, 'nonce': current_nonce }
             
@@ -434,7 +442,7 @@ class PredictiveTest(LiquidityTestBase):
                 gas_est_swap = self.token_manager_contract.functions.swap(
                     checksum_token_in, checksum_token_out, pool_fee_for_swap, amount_to_swap_wei, 0
                 ).estimate_gas({'from': funding_account.address})
-                swap_tx_params['gas'] = int(gas_est_swap * 1.30) 
+                swap_tx_params['gas'] = int(gas_est_swap * 1.30)
             except ContractLogicError as cle:
                 logger.error(f"Gas estimation for TokenManager swap (Predictive) failed due to contract logic: {cle}.")
                 return False
@@ -471,7 +479,8 @@ class PredictiveTest(LiquidityTestBase):
     def _call_collect_fees_only(self, funding_account, private_key_env) -> bool:
         logger.info("Attempting to call collectCurrentFeesOnly() on PredictiveLiquidityManager...")
         if not self.contract:
-            logger.error("PredictiveLiquidityManager contract instance not available for collectCurrentFeesOnly."); return False
+            logger.error("PredictiveLiquidityManager contract instance not available for collectCurrentFeesOnly.")
+            return False
         
         # Initialize fee metrics if they are None (first time being set)
         if self.metrics.get('fees_collected_token0') is None: self.metrics['fees_collected_token0'] = 0
@@ -489,7 +498,7 @@ class PredictiveTest(LiquidityTestBase):
             self.metrics['error_message'] = (self.metrics.get('error_message', "") + f";CollectFeesGasEstLogicError: {str(cle)[:100]}").strip(';')
             return False
         except Exception as e:
-            tx_params['gas'] = 300000 
+            tx_params['gas'] = 300000
             logger.warning(f"Gas estimation for collectCurrentFeesOnly failed: {e}. Using default {tx_params['gas']}.")
 
         try:
@@ -568,7 +577,10 @@ class PredictiveTest(LiquidityTestBase):
         private_key_env = os.getenv('PRIVATE_KEY')
         if not private_key_env:
             logger.error("PRIVATE_KEY not found for adjust_position.")
-            self.metrics['action_taken'] = self.ACTION_STATES["UNEXPECTED_ERROR"]; self.metrics['error_message'] = "PRIVATE_KEY missing for adjustment tx"; self.save_metrics(); return False
+            self.metrics['action_taken'] = self.ACTION_STATES["UNEXPECTED_ERROR"]
+            self.metrics['error_message'] = "PRIVATE_KEY missing for adjustment tx"
+            self.save_metrics()
+            return False
         
         funding_account = Account.from_key(private_key_env)
         stage_results = {'initial_adjustment': False, 'swap': False, 'collect_only': False, 'final_adjustment': False}
@@ -593,7 +605,8 @@ class PredictiveTest(LiquidityTestBase):
                 self.token1, self.token1_decimals, target_weth_balance, private_key_env
             ):
                 logger.error("Precise funding for Predictive contract failed (initial).")
-                self.metrics['action_taken'] = self.ACTION_STATES["FUNDING_FAILED"]; self.metrics['error_message'] = "Precise contract funding failed (initial)"
+                self.metrics['action_taken'] = self.ACTION_STATES["FUNDING_FAILED"]
+                self.metrics['error_message'] = "Precise contract funding failed (initial)"
                 if 'currentTickLower_contract' in self.metrics: self.metrics['finalTickLower_contract'] = self.metrics.get('currentTickLower_contract', 0)
                 if 'currentTickUpper_contract' in self.metrics: self.metrics['finalTickUpper_contract'] = self.metrics.get('currentTickUpper_contract', 0)
                 if 'currentLiquidity_contract' in self.metrics: self.metrics['finalLiquidity_contract'] = self.metrics.get('currentLiquidity_contract', 0)
@@ -608,8 +621,11 @@ class PredictiveTest(LiquidityTestBase):
             tx_function_call_initial = self.contract.functions.updatePredictionAndAdjust(predicted_tick)
             current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address)
             tx_params_initial = {'from': funding_account.address, 'nonce': current_nonce, 'chainId': int(web3_utils.w3.net.version)}
-            try: tx_params_initial['gas'] = int(tx_function_call_initial.estimate_gas({'from': funding_account.address}) * 1.25)
-            except Exception as est_err: logger.warning(f"Gas estimation for 'updatePredictionAndAdjust' (initial) failed: {est_err}. Using default 1,500,000"); tx_params_initial['gas'] = 1500000
+            try:
+                tx_params_initial['gas'] = int(tx_function_call_initial.estimate_gas({'from': funding_account.address}) * 1.25)
+            except Exception as est_err:
+                logger.warning(f"Gas estimation for 'updatePredictionAndAdjust' (initial) failed: {est_err}. Using default 1,500,000")
+                tx_params_initial['gas'] = 1500000
             built_tx_initial = tx_function_call_initial.build_transaction(tx_params_initial)
             receipt_initial = web3_utils.send_transaction(built_tx_initial, private_key_env)
             self.metrics['tx_hash'] = receipt_initial.transactionHash.hex() if receipt_initial else None
@@ -645,7 +661,8 @@ class PredictiveTest(LiquidityTestBase):
                 except Exception as log_err_initial: logger.exception(f"Error processing logs for initial predictive transaction: {log_err_initial}")
             elif receipt_initial:
                 logger.error(f"Initial adjustment transaction reverted. Tx: {self.metrics['tx_hash']}")
-                self.metrics['action_taken'] = self.ACTION_STATES["TX_REVERTED"]; self.metrics['error_message'] = "tx_reverted_onchain (initial)"
+                self.metrics['action_taken'] = self.ACTION_STATES["TX_REVERTED"]
+                self.metrics['error_message'] = "tx_reverted_onchain (initial)"
                 self.metrics['gas_used'] = receipt_initial.get('gasUsed', 0)
                 if 'currentTickLower_contract' in self.metrics: self.metrics['finalTickLower_contract'] = self.metrics.get('currentTickLower_contract', 0)
                 if 'currentTickUpper_contract' in self.metrics: self.metrics['finalTickUpper_contract'] = self.metrics.get('currentTickUpper_contract', 0)
@@ -661,27 +678,52 @@ class PredictiveTest(LiquidityTestBase):
                 self.save_metrics(); return False
         except Exception as tx_err_initial:
             logger.exception(f"Error during initial adjustment transaction: {tx_err_initial}")
-            self.metrics['action_taken'] = self.ACTION_STATES["UNEXPECTED_ERROR"]; self.metrics['error_message'] = f"TxError (initial):{str(tx_err_initial)}"
+            self.metrics['action_taken'] = self.ACTION_STATES["UNEXPECTED_ERROR"]
+            self.metrics['error_message'] = f"TxError (initial):{str(tx_err_initial)}"
             self.save_metrics(); return False
+        
+        # --- Parameters for Swap Simulation ---
+        NUM_SWAPS = 50
+        SWAP_AMOUNT_WETH = Decimal("2.5")
 
-        # --- STAGE 2: Perform Swap via TokenManager to Generate Fees ---
+        # --- STAGE 2: Perform Multiple Swaps via TokenManager to Generate Fees ---
         if stage_results['initial_adjustment']:
-            logger.info("\n--- STAGE 2: Predictive Strategy - Performing swap for fees ---")
-            swap_token_in_addr = self.token1 
-            swap_token_out_addr = self.token0 
-            swap_amount_readable = Decimal("2.0") # Increased swap amount
-            token_in_decimals_for_swap = self.token1_decimals
-            token_out_decimals_for_swap = self.token0_decimals
-            stage_results['swap'] = self._perform_swap_for_fees(
-                funding_account, private_key_env,
-                swap_token_in_addr, swap_token_out_addr,
-                swap_amount_readable, token_in_decimals_for_swap, token_out_decimals_for_swap
-            )
-            if stage_results['swap']: self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_SWAP_FEES"]
-            else: self.metrics['action_taken'] = self.ACTION_STATES["SWAP_FOR_FEES_FAILED"]; self.metrics['error_message'] = (self.metrics.get('error_message', "") + ";Swap for fees failed or skipped").strip(';')
+            logger.info(f"\n--- STAGE 2: Predictive Strategy - Simulating {NUM_SWAPS} swaps to generate fees ---")
+            all_swaps_successful = True  # A flag to track the success of all swaps
+            for i in range(NUM_SWAPS):
+                logger.info(f"--- Performing Swap {i + 1}/{NUM_SWAPS} ---")
+        
+                swap_token_in_addr = self.token1
+                swap_token_out_addr = self.token0
+                token_in_decimals_for_swap = self.token1_decimals
+                token_out_decimals_for_swap = self.token0_decimals
+
+                # Call your existing swap function inside the loop
+                swap_successful_this_iteration = self._perform_swap_for_fees(
+                    funding_account, private_key_env,
+                    swap_token_in_addr, swap_token_out_addr,
+                    SWAP_AMOUNT_WETH,  # Use the parameter here
+                    token_in_decimals_for_swap, token_out_decimals_for_swap
+                )
+                # If any swap fails, we stop the loop and mark the whole stage as failed
+                if not swap_successful_this_iteration:
+                    logger.error(f"Swap {i + 1} failed, stopping the swap simulation.")
+                    all_swaps_successful = False
+                    break
+            # After the loop, update the main stage result based on the outcome of all swaps
+            stage_results['swap'] = all_swaps_successful
+
+            if all_swaps_successful:
+                self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_SWAP_FEES"]
+                logger.info(f"All {NUM_SWAPS} swaps completed successfully.")
+            else:
+                self.metrics['action_taken'] = self.ACTION_STATES["SWAP_FOR_FEES_FAILED"]
+                self.metrics['error_message'] = (self.metrics.get('error_message', "") + f";Swap simulation failed at iteration {i + 1}").strip(';')
 
         # --- STAGE 2.5: Explicitly Collect Fees ---
+        # This part remains unchanged. It will now run only if ALL swaps were successful.
         if stage_results['initial_adjustment'] and stage_results['swap']:
+        #----------------------------------
             logger.info("\n--- STAGE 2.5: Predictive Strategy - Explicit Fee Collection ---")
             stage_results['collect_only'] = self._call_collect_fees_only(funding_account, private_key_env)
         else:
@@ -769,28 +811,32 @@ class PredictiveTest(LiquidityTestBase):
                                     logger.info(f"Uniswap NFPM Collect Event (FINAL Tx, TokenId={nfpm_log_entry.args.tokenId}): Amount0={nfpm_log_entry.args.amount0}, Amount1={nfpm_log_entry.args.amount1}")
                                     # If a full remove/collect cycle happened, these are the total collected values (principal+fees)
                                     # Potentially overwrite the main fee fields if this collect is more comprehensive
-                                    self.metrics['fees_collected_token0'] = nfpm_log_entry.args.amount0 
+                                    self.metrics['fees_collected_token0'] = nfpm_log_entry.args.amount0
                                     self.metrics['fees_collected_token1'] = nfpm_log_entry.args.amount1
                                     logger.info(f"Main fee metrics (fees_collected_token0/1) updated from FINAL Tx Uniswap NFPM Collect: ({self.metrics['fees_collected_token0']}, {self.metrics['fees_collected_token1']})")
-                                    break 
+                                    break
                         self.update_pool_and_position_metrics(final_update=True)
                     
                     elif receipt_final:
                         logger.error(f"Final adjustment transaction reverted. Tx: {receipt_final.transactionHash.hex()}")
-                        self.metrics['action_taken'] = self.ACTION_STATES["TX_REVERTED"]; self.metrics['error_message'] = (self.metrics.get('error_message', "") + ";Final adjustment reverted").strip(';')
-                        self.metrics['gas_used'] += receipt_final.get('gasUsed', 0); stage_results['final_adjustment'] = False
+                        self.metrics['action_taken'] = self.ACTION_STATES["TX_REVERTED"]
+                        self.metrics['error_message'] = (self.metrics.get('error_message', "") + ";Final adjustment reverted").strip(';')
+                        self.metrics['gas_used'] += receipt_final.get('gasUsed', 0)
+                        stage_results['final_adjustment'] = False
                     else:
                         logger.error("Final adjustment transaction sending/receipt failed.")
                         if self.metrics['action_taken'] != self.ACTION_STATES["TX_REVERTED"]: self.metrics['action_taken'] = self.ACTION_STATES["TX_WAIT_FAILED"]
-                        self.metrics['error_message'] = (self.metrics.get('error_message', "") + ";Final adjustment send failed").strip(';'); stage_results['final_adjustment'] = False
+                        self.metrics['error_message'] = (self.metrics.get('error_message', "") + ";Final adjustment send failed").strip(';')
+                        stage_results['final_adjustment'] = False
             except Exception as tx_err_final:
                 logger.exception(f"Error during final adjustment transaction: {tx_err_final}")
                 if self.metrics.get('action_taken') not in [self.ACTION_STATES["SWAP_FOR_FEES_FAILED"], self.ACTION_STATES["FEES_COLLECT_ONLY_FAILED"]]: self.metrics['action_taken'] = self.ACTION_STATES["UNEXPECTED_ERROR"]
-                self.metrics['error_message'] = (self.metrics.get('error_message', "") + f";TxError (final):{str(tx_err_final)}").strip(';'); stage_results['final_adjustment'] = False
+                self.metrics['error_message'] = (self.metrics.get('error_message', "") + f";TxError (final):{str(tx_err_final)}").strip(';')
+                stage_results['final_adjustment'] = False
         else:
             logger.info("Skipping Stage 3 (Final Position Adjustment) due to previous stage failure(s).")
-            if stage_results['initial_adjustment'] and stage_results['swap'] and not stage_results['collect_only']: stage_results['final_adjustment'] = False 
-            else: stage_results['final_adjustment'] = True 
+            if stage_results['initial_adjustment'] and stage_results['swap'] and not stage_results['collect_only']: stage_results['final_adjustment'] = False
+            else: stage_results['final_adjustment'] = True
 
         logger.info("Updating final pool and position metrics in 'finally' block for Predictive...")
         self.update_pool_and_position_metrics(final_update=True)
@@ -818,40 +864,40 @@ class PredictiveTest(LiquidityTestBase):
             'predictedPrice_api', 'predictedTick_calculated',
             'external_api_eth_price',
             'actualPrice_pool', 'sqrtPriceX96_pool', 'currentTick_pool',
-            'targetTickLower_calculated', 'targetTickUpper_calculated', 
+            'targetTickLower_calculated', 'targetTickUpper_calculated',
             'initial_contract_balance_token0',
             'initial_contract_balance_token1',
-            'finalTickLower_contract', 'finalTickUpper_contract', 'liquidity_contract', 
+            'finalTickLower_contract', 'finalTickUpper_contract', 'liquidity_contract',
             'amount0_provided_to_mint',
             'amount1_provided_to_mint',
-            'fees_collected_token0', 
-            'fees_collected_token1', 
-            'gas_used', 'gas_cost_eth', 'error_message'        
+            'fees_collected_token0',
+            'fees_collected_token1',
+            'gas_used', 'gas_cost_eth', 'error_message'
         ]
         
         row_data = {}
         for col in columns:
             val = self.metrics.get(col)
             if val is None:
-                if col in ['sqrtPriceX96_pool', 'currentTick_pool', 'targetTickLower_calculated', 
-                           'targetTickUpper_calculated', 
-                           'initial_contract_balance_token0', 
-                           'initial_contract_balance_token1', 'finalTickLower_contract', 
-                           'finalTickUpper_contract', 'liquidity_contract', 
+                if col in ['sqrtPriceX96_pool', 'currentTick_pool', 'targetTickLower_calculated',
+                           'targetTickUpper_calculated',
+                           'initial_contract_balance_token0',
+                           'initial_contract_balance_token1', 'finalTickLower_contract',
+                           'finalTickUpper_contract', 'liquidity_contract',
                            'amount0_provided_to_mint', 'amount1_provided_to_mint',
                            'fees_collected_token0', 'fees_collected_token1',
-                           'fees_collected_token0_via_collect_only', 
+                           'fees_collected_token0_via_collect_only',
                            'fees_collected_token1_via_collect_only',
                            'gas_used', 'gas_cost_eth', 'range_width_multiplier_setting',
                            'predictedTick_calculated']:
                     row_data[col] = 0 if col not in ['predictedPrice_api', 'external_api_eth_price'] else ""
                 elif col not in ['tx_hash', 'error_message', 'action_taken', 'contract_type', 'timestamp', 'actualPrice_pool', 'external_api_eth_price']:
-                     row_data[col] = ""
+                    row_data[col] = ""
                 elif self.metrics.get(col) is None :
                     row_data[col] = ""
             else:
                 if col == 'external_api_eth_price' and isinstance(val, float): row_data[col] = f"{val:.2f}"
-                elif col == 'gas_cost_eth' and isinstance(val, float): row_data[col] = f"{val:.18f}" 
+                elif col == 'gas_cost_eth' and isinstance(val, float): row_data[col] = f"{val:.18f}"
                 else: row_data[col] = val
         
         try:
@@ -898,8 +944,8 @@ def main():
         logger.info(f"Loaded Predictive Manager Address from ENV: {predictive_address}")
 
         test_instance = PredictiveTest(predictive_address)
-        desired_rwm = int(os.getenv('PREDICTIVE_RWM', '100')) 
-        target_weth = float(os.getenv('PREDICTIVE_TARGET_WETH', '5.0')) 
+        desired_rwm = int(os.getenv('PREDICTIVE_RWM', '100'))
+        target_weth = float(os.getenv('PREDICTIVE_TARGET_WETH', '5.0'))
         target_usdc = float(os.getenv('PREDICTIVE_TARGET_USDC', '10000.0'))
 
         test_instance.execute_test_steps(
@@ -923,15 +969,15 @@ def main():
         
         if test_instance is None:
             if predictive_address and Web3.is_address(predictive_address):
-                 test_instance = PredictiveTest(predictive_address)
+                test_instance = PredictiveTest(predictive_address)
             else:
                 test_instance = PredictiveTest("0x"+"0"*40)
 
-        if hasattr(test_instance, 'metrics'): 
+        if hasattr(test_instance, 'metrics'):
             test_instance.metrics['action_taken'] = test_instance.ACTION_STATES["UNEXPECTED_ERROR"]
             test_instance.metrics['error_message'] = (test_instance.metrics.get('error_message',"") + f"; MainException: {str(e)}").strip(";")
             test_instance.save_metrics()
-    finally: 
+    finally:
         logger.info("=" * 50)
         logger.info("Predictive test run finished.")
         logger.info("=" * 50)

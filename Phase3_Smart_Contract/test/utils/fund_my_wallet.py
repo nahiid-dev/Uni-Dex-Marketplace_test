@@ -25,7 +25,7 @@ TOKEN_CONFIG = {
     "WETH": {
         "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
         "whale": "0x2f0b23f53734252bda2277357e97e1517d6b042a", # یک حساب شناخته شده با WETH زیاد
-        "amount_readable": 20, # مقدار WETH برای انتقال به deployer
+        "amount_readable": 300, # مقدار WETH برای انتقال به deployer
         "decimals": 18
     },
     "USDC": {
