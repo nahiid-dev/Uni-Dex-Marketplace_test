@@ -3,9 +3,9 @@ require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
 require("dotenv").config();
 
-// Load environment variables with fallback values
-const MAINNET_RPC_URL = process.env.MAINNET_RPC_URL || "https://mainnet.infura.io/v3/6cb906401b0b4ab4a53beef2c28ba519";
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "5a60efae01d1bdfc5cda1c770cef2aa77ba716d77792c804abd6cfa256882853"; // Default Hardhat account #0
+// Load environment variables. Rely ONLY on the .env file.
+const MAINNET_RPC_URL = process.env.MAINNET_RPC_URL || "";
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
 module.exports = {

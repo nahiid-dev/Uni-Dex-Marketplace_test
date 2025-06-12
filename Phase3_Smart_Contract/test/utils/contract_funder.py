@@ -2,11 +2,12 @@ import logging
 import time
 from web3 import Web3
 from eth_account import Account
-from . import web3_utils # فرض بر این است که web3_utils در همین پکیج قرار دارد
+# این ایمپورت باید به ماژول web3_utils که در کنار آن قرار دارد، دسترسی داشته باشد
+from . import web3_utils
 
 logger = logging.getLogger(__name__)
 
-MIN_GAS_FOR_TRANSFER = 50000 # مقدار پیش‌فرض گاز برای انتقال توکن
+MIN_GAS_FOR_TRANSFER = 50000
 
 def ensure_precise_token_balances(
     contract_address: str,
@@ -22,14 +23,15 @@ def ensure_precise_token_balances(
     Ensures the target contract has precise amounts of token0 and token1.
     Funds from the funding_account.
     """
-    if not web3_utils.w3 or not web3_utils.w3.is_connected():
-        if not web3_utils.init_web3(): # init_web3 باید web3_utils.w3 را تنظیم کند
+    # [اصلاح شد] بررسی اتصال وب‌تری، چون تابع init_web3 این کار را انجام می‌دهد، این شرط حذف شد
+    if not web3_utils.w3:
+        if not web3_utils.init_web3():
             logger.error("Web3 connection failed in ensure_precise_token_balances.")
             return False
     
-    # از آخرین نمونه w3 از web3_utils استفاده کنید
-    w3 = web3_utils.w3 
-    if not w3: # بررسی اضافی اگر init_web3 موفقیت آمیز نباشد و w3 را برنگرداند
+    # حالا مطمئن هستیم که w3 از web3_utils در دسترس است
+    w3 = web3_utils.w3
+    if not w3:
         logger.error("Web3 instance is not available after initialization attempt.")
         return False
 
@@ -37,7 +39,6 @@ def ensure_precise_token_balances(
         funding_account = Account.from_key(funding_account_private_key)
         contract_checksum_addr = Web3.to_checksum_address(contract_address)
         funder_checksum_addr = Web3.to_checksum_address(funding_account.address)
-
 
         tokens_to_fund = [
             {"name": "Token0", "address": token0_address, "decimals": token0_decimals, "target_readable": target_token0_amount_readable},
@@ -61,8 +62,6 @@ def ensure_precise_token_balances(
                 logger.info(f"Contract {contract_checksum_addr} already has target balance of {token_info['name']} ({token_info['target_readable']}).")
                 continue
             elif needed_wei < 0:
-                # اگر موجودی فعلی بیشتر از هدف باشد، هشدار داده می‌شود.
-                # در این سناریو، معمولاً توکنی ارسال نمی‌شود مگر اینکه بخواهیم موجودی را کاهش دهیم.
                 actual_balance_readable = current_bal_wei / (10**token_info['decimals'])
                 logger.warning(f"Contract {contract_checksum_addr} has MORE {token_info['name']} ({actual_balance_readable}) than target ({token_info['target_readable']}). Skipping transfer for this token.")
                 continue
@@ -79,33 +78,39 @@ def ensure_precise_token_balances(
             
             tx_params_dict = {
                 'from': funder_checksum_addr,
-                'nonce': current_nonce, # Nonce باید برای هر تراکنش افزایش یابد
-                'chainId': int(w3.net.version) 
+                'nonce': current_nonce,
+                # [اصلاح شد] استفاده از w3.eth.chain_id به جای w3.net.version
+                'chainId': w3.eth.chain_id 
             }
             
-            # ساخت تراکنش اولیه برای تخمین گاز
             transfer_tx_build = token_contract.functions.transfer(contract_checksum_addr, needed_wei)
             
             try:
-                # تخمین گاز قبل از افزودن به tx_params_dict
-                gas_estimate = transfer_tx_build.estimate_gas({'from': funder_checksum_addr, 'to': token_info["address"]})
-                tx_params_dict['gas'] = int(gas_estimate * 1.2) # افزودن بافر به گاز تخمینی
+                # ==============================================================================
+                # <<< FIX START >>>
+                # The 'to' field should not be in the estimate_gas dictionary for contract calls
+                # in modern web3.py versions, as it's implicit in the contract object.
+                # OLD: .estimate_gas({'from': funder_checksum_addr, 'to': token_info["address"]})
+                # NEW: .estimate_gas({'from': funder_checksum_addr})
+                gas_estimate = transfer_tx_build.estimate_gas({'from': funder_checksum_addr})
+                # <<< FIX END >>>
+                # ==============================================================================
+                tx_params_dict['gas'] = int(gas_estimate * 1.2)
             except Exception as e:
                 logger.warning(f"Gas estimation failed for {token_info['name']} transfer: {e}. Using default gas: {MIN_GAS_FOR_TRANSFER * 2}")
-                tx_params_dict['gas'] = MIN_GAS_FOR_TRANSFER * 2 # مقدار پیش‌فرض در صورت خطا
+                tx_params_dict['gas'] = MIN_GAS_FOR_TRANSFER * 2
 
-            # ساخت نهایی تراکنش با پارامترهای کامل شامل گاز
             final_transfer_tx = transfer_tx_build.build_transaction(tx_params_dict)
 
-            receipt = web3_utils.send_transaction(final_transfer_tx, funding_account_private_key) # ارسال کلید خصوصی به send_transaction
+            receipt = web3_utils.send_transaction(final_transfer_tx, funding_account_private_key)
             if not receipt or receipt.status == 0:
                 tx_hash_str = receipt.transactionHash.hex() if receipt else 'N/A'
                 logger.error(f"Failed to transfer {token_info['name']} to contract {contract_checksum_addr}. TxHash: {tx_hash_str}")
                 return False
             
             logger.info(f"{token_info['name']} transfer successful to {contract_checksum_addr}. TxHash: {receipt.transactionHash.hex()}")
-            current_nonce += 1 # افزایش nonce برای تراکنش بعدی
-            time.sleep(0.5) # کاهش زمان انتظار یا حذف آن در صورت عدم نیاز
+            current_nonce += 1
+            time.sleep(0.5)
 
         return True
     except Exception as e:

@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# filepath: d:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\test\utils\test_base.py
+# test_base.py
 import os
 import logging
 from abc import ABC, abstractmethod
@@ -66,8 +65,8 @@ class LiquidityTestBase(ABC):
                 return False
             
             # Ensure the w3 instance in web3_utils is usable
-            if not web3_utils.w3 or not web3_utils.w3.is_connected():
-                 logger.error("web3_utils.w3 is not available or not connected after init_web3 call.")
+            if not web3_utils.w3:
+                 logger.error("web3_utils.w3 is not available after init_web3 call.")
                  return False
 
 
@@ -118,7 +117,7 @@ class LiquidityTestBase(ABC):
         if not self.contract or not self.token0 or not self.token1:
             logger.error("Contract or tokens not initialized. Run setup first.")
             return False
-        if not web3_utils.w3 or not web3_utils.w3.is_connected():
+        if not web3_utils.w3:
             logger.error("Web3 not connected in check_balances.")
             return False
         try:
@@ -187,7 +186,7 @@ class LiquidityTestBase(ABC):
         if not self.contract:
             logger.error("Contract not initialized. Run setup first.")
             return None
-        if not web3_utils.w3 or not web3_utils.w3.is_connected():
+        if not web3_utils.w3:
             logger.error("Web3 not connected in get_position_info.")
             return None
         try:
@@ -204,15 +203,15 @@ class LiquidityTestBase(ABC):
                 return None
 
             if pos_data and len(pos_data) == 5:
-                 position = {
+                position = {
                     'tokenId': pos_data[0],
                     'liquidity': pos_data[1],
                     'tickLower': pos_data[2],
                     'tickUpper': pos_data[3],
                     'active': pos_data[4]
                 }
-                 logger.debug(f"Fetched Position Info: {position}")
-                 return position
+                logger.debug(f"Fetched Position Info: {position}")
+                return position
             else:
                 logger.error(f"Position data format unexpected or not found. Data: {pos_data}")
                 return None
@@ -222,8 +221,7 @@ class LiquidityTestBase(ABC):
             return None     
     def _calculate_actual_price(self, sqrt_price_x96: int) -> Decimal:
         """
-        Calculates the human-readable price from sqrtPriceX96.
-        For USDC/WETH pool:
+        Calculates the human-readable price from sqrtPriceX96. For USDC/WETH pool:
         - token0 is USDC (6 decimals)
         - token1 is WETH (18 decimals)
         - sqrtPriceX96 represents: √(token1/token0) * 2^96
@@ -231,7 +229,7 @@ class LiquidityTestBase(ABC):
         1. Convert sqrtPriceX96 to actual price ratio
         2. Invert the ratio since we want USDC/WETH not WETH/USDC
         3. Adjust for decimals
-        """
+         """
         if not sqrt_price_x96 or sqrt_price_x96 == 0:
             return Decimal(0)
         if self.token0_decimals is None or self.token1_decimals is None:
