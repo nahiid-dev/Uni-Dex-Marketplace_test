@@ -101,7 +101,11 @@ contract PredictiveLiquidityManager is
             revert("Token1 does not support decimals()");
         }
 
-        address poolAddress = IUniswapV3Factory(_factory).getPool(_token0, _token1, _fee);
+        address poolAddress = IUniswapV3Factory(_factory).getPool(
+            _token0,
+            _token1,
+            _fee
+        );
         require(poolAddress != address(0), "Pool does not exist");
         tickSpacing = IUniswapV3Pool(poolAddress).tickSpacing();
 
@@ -112,11 +116,14 @@ contract PredictiveLiquidityManager is
             transferOwnership(_initialOwner);
         }
     }
-    
+
     function setRangeWidthMultiplier(uint24 _newMultiplier) external onlyOwner {
         require(_newMultiplier > 0, "RWM must be > 0");
         rangeWidthMultiplier = _newMultiplier;
-        emit StrategyParamUpdated("rangeWidthMultiplier", uint256(_newMultiplier));
+        emit StrategyParamUpdated(
+            "rangeWidthMultiplier",
+            uint256(_newMultiplier)
+        );
     }
 
     function updatePredictionAndAdjust(
@@ -154,20 +161,30 @@ contract PredictiveLiquidityManager is
     }
 
     // NEW public function to only collect fees
-    function collectCurrentFeesOnly() external nonReentrant onlyOwner returns (uint256 amount0, uint256 amount1) {
-        require(currentPosition.active && currentPosition.tokenId != 0, "PLM: No active position to collect fees from");
+    function collectCurrentFeesOnly()
+        external
+        nonReentrant
+        onlyOwner
+        returns (uint256 amount0, uint256 amount1)
+    {
+        require(
+            currentPosition.active && currentPosition.tokenId != 0,
+            "PLM: No active position to collect fees from"
+        );
 
         uint256 _tokenId = currentPosition.tokenId;
         bool collectCallSuccess = false;
 
-        try positionManager.collect(
-            INonfungiblePositionManager.CollectParams({
-                tokenId: _tokenId,
-                recipient: address(this), // Fees to this contract
-                amount0Max: type(uint128).max, // Collect all available
-                amount1Max: type(uint128).max  // Collect all available
-            })
-        ) returns (uint256 collected0, uint256 collected1) {
+        try
+            positionManager.collect(
+                INonfungiblePositionManager.CollectParams({
+                    tokenId: _tokenId,
+                    recipient: address(this), // Fees to this contract
+                    amount0Max: type(uint128).max, // Collect all available
+                    amount1Max: type(uint128).max // Collect all available
+                })
+            )
+        returns (uint256 collected0, uint256 collected1) {
             amount0 = collected0;
             amount1 = collected1;
             collectCallSuccess = true;
@@ -175,16 +192,17 @@ contract PredictiveLiquidityManager is
             // Optional: emit an error event or log the reason
             // For now, success will remain false
             emit FeesOnlyCollected(_tokenId, 0, 0, false); // Emit failure
-            revert(string(abi.encodePacked("PLM: CollectOnly failed - ", reason)));
+            revert(
+                string(abi.encodePacked("PLM: CollectOnly failed - ", reason))
+            );
         } catch {
             emit FeesOnlyCollected(_tokenId, 0, 0, false); // Emit failure
             revert("PLM: CollectOnly failed with unknown error");
         }
-        
+
         emit FeesOnlyCollected(_tokenId, amount0, amount1, collectCallSuccess);
         return (amount0, amount1);
     }
-
 
     function _calculateTicks(
         int24 targetCenterTick
@@ -200,14 +218,18 @@ contract PredictiveLiquidityManager is
 
         tickLower = floorToTickSpacing(rawTickLower, tickSpacing);
         tickUpper = floorToTickSpacing(rawTickUpper, tickSpacing);
-        if ((rawTickUpper % tickSpacing) != 0 && rawTickUpper > 0) { // Ensure rounding up for positive side
-             tickUpper += tickSpacing;
-        } else if ((rawTickUpper % tickSpacing) != 0 && rawTickUpper < 0 && tickUpper != rawTickUpper) {
+        if ((rawTickUpper % tickSpacing) != 0 && rawTickUpper > 0) {
+            // Ensure rounding up for positive side
+            tickUpper += tickSpacing;
+        } else if (
+            (rawTickUpper % tickSpacing) != 0 &&
+            rawTickUpper < 0 &&
+            tickUpper != rawTickUpper
+        ) {
             // For negative ticks, floorToTickSpacing moves away from zero. If rawTickUpper was not a multiple,
             // and floor moved it further from targetCenterTick, consider adding tickSpacing if logic requires tighter upper bound.
             // This part is complex; for now, simple floor for upper is used and then checked.
         }
-
 
         if (tickLower >= tickUpper) {
             tickUpper = tickLower + tickSpacing;
@@ -219,21 +241,32 @@ contract PredictiveLiquidityManager is
         tickUpper = tickUpper > TickMath.MAX_TICK
             ? floorToTickSpacing(TickMath.MAX_TICK, tickSpacing)
             : tickUpper;
-        
-        if (tickLower >= tickUpper) { // Final check
+
+        if (tickLower >= tickUpper) {
+            // Final check
             if (tickUpper == TickMath.MAX_TICK) {
                 tickLower = tickUpper - tickSpacing;
             } else {
                 tickUpper = tickLower + tickSpacing;
-                 if (tickUpper > TickMath.MAX_TICK) { // Re-check if pushing upper overshot MAX_TICK
-                    tickUpper = floorToTickSpacing(TickMath.MAX_TICK, tickSpacing);
+                if (tickUpper > TickMath.MAX_TICK) {
+                    // Re-check if pushing upper overshot MAX_TICK
+                    tickUpper = floorToTickSpacing(
+                        TickMath.MAX_TICK,
+                        tickSpacing
+                    );
                     tickLower = tickUpper - tickSpacing; // Adjust lower accordingly
-                 }
+                }
             }
         }
         // Ensure lower is strictly less than upper, and within bounds.
-        require(tickLower < tickUpper, "PLM: TickLower must be less than TickUpper");
-        require(tickLower >= TickMath.MIN_TICK && tickUpper <= TickMath.MAX_TICK, "PLM: Ticks out of bounds");
+        require(
+            tickLower < tickUpper,
+            "PLM: TickLower must be less than TickUpper"
+        );
+        require(
+            tickLower >= TickMath.MIN_TICK && tickUpper <= TickMath.MAX_TICK,
+            "PLM: Ticks out of bounds"
+        );
 
         return (tickLower, tickUpper);
     }
@@ -247,11 +280,11 @@ contract PredictiveLiquidityManager is
         // If either old or new range is significantly different, they are not close.
         // Tolerance could be a fraction of rangeWidthMultiplier or a fixed number of tickSpacings.
         // For simplicity, using half of the halfWidth (quarter of total width in ticks) as a threshold.
-        int24 tolerance = (tickSpacing * int24(rangeWidthMultiplier)) / 4; 
+        int24 tolerance = (tickSpacing * int24(rangeWidthMultiplier)) / 4;
         if (tolerance < tickSpacing) tolerance = tickSpacing; // Minimum tolerance of one tickSpacing
 
         return (_abs(oldLower - newLower) < tolerance &&
-                _abs(oldUpper - newUpper) < tolerance);
+            _abs(oldUpper - newUpper) < tolerance);
     }
 
     function _abs(int24 x) internal pure returns (int24) {
@@ -295,7 +328,7 @@ contract PredictiveLiquidityManager is
         uint128 _liquidity = currentPosition.liquidity;
         int24 _tickLower = currentPosition.tickLower;
         int24 _tickUpper = currentPosition.tickUpper;
-        
+
         // Reset position state before external calls for reentrancy safety,
         // though ReentrancyGuard is also used.
         currentPosition = Position(0, 0, 0, 0, false);
@@ -319,22 +352,50 @@ contract PredictiveLiquidityManager is
                         deadline: block.timestamp
                     })
                 )
-            // DecreaseLiquidity does not return amounts, they are claimed by collect
-            returns (uint256 decAmount0, uint256 decAmount1) { 
+            returns (
+                // DecreaseLiquidity does not return amounts, they are claimed by collect
+                uint256 decAmount0,
+                uint256 decAmount1
+            ) {
                 amount0FromDecrease = decAmount0; // Store amounts from decrease
                 amount1FromDecrease = decAmount1;
                 decreaseOpSuccess = true;
             } catch Error(string memory reason) {
                 // For LiquidityOperation, report total collected as 0 if decrease fails severely
-                emit LiquidityOperation("REMOVE", _tokenId, _tickLower, _tickUpper, _liquidity, 0, 0, false);
-                revert(string(abi.encodePacked("PLM: DecreaseLiquidity failed - ", reason)));
+                emit LiquidityOperation(
+                    "REMOVE",
+                    _tokenId,
+                    _tickLower,
+                    _tickUpper,
+                    _liquidity,
+                    0,
+                    0,
+                    false
+                );
+                revert(
+                    string(
+                        abi.encodePacked(
+                            "PLM: DecreaseLiquidity failed - ",
+                            reason
+                        )
+                    )
+                );
             } catch {
-                emit LiquidityOperation("REMOVE", _tokenId, _tickLower, _tickUpper, _liquidity, 0, 0, false);
+                emit LiquidityOperation(
+                    "REMOVE",
+                    _tokenId,
+                    _tickLower,
+                    _tickUpper,
+                    _liquidity,
+                    0,
+                    0,
+                    false
+                );
                 revert("PLM: DecreaseLiquidity failed with unknown error");
             }
         } else {
             // If liquidity was already zero, consider decrease "successful" for flow
-            decreaseOpSuccess = true; 
+            decreaseOpSuccess = true;
         }
 
         // Always attempt to collect, even if liquidity was 0 (there might be uncollected fees)
@@ -355,22 +416,45 @@ contract PredictiveLiquidityManager is
         } catch Error(string memory reason) {
             // If collect fails, the overall REMOVE operation's success might be debatable.
             // We still emit amounts from decrease if that succeeded.
-            emit LiquidityOperation("REMOVE", _tokenId, _tickLower, _tickUpper, _liquidity, amount0FromDecrease, amount1FromDecrease, false);
+            emit LiquidityOperation(
+                "REMOVE",
+                _tokenId,
+                _tickLower,
+                _tickUpper,
+                _liquidity,
+                amount0FromDecrease,
+                amount1FromDecrease,
+                false
+            );
             revert(string(abi.encodePacked("PLM: Collect failed - ", reason)));
         } catch {
-            emit LiquidityOperation("REMOVE", _tokenId, _tickLower, _tickUpper, _liquidity, amount0FromDecrease, amount1FromDecrease, false);
+            emit LiquidityOperation(
+                "REMOVE",
+                _tokenId,
+                _tickLower,
+                _tickUpper,
+                _liquidity,
+                amount0FromDecrease,
+                amount1FromDecrease,
+                false
+            );
             revert("PLM: Collect failed with unknown error");
         }
 
         // Burn the NFT only if collect was (at least attempted and didn't revert here)
         // and decrease was successful.
-        if (decreaseOpSuccess) { // Might be true even if _liquidity was 0.
-            try positionManager.burn(_tokenId) {} catch Error(string memory reason) {
+        if (decreaseOpSuccess) {
+            // Might be true even if _liquidity was 0.
+            try positionManager.burn(_tokenId) {} catch Error(
+                string memory reason
+            ) {
                 // Log or handle burn failure; it's non-critical for fund recovery but bad for state.
                 // For simplicity, we don't revert the whole tx for burn failure.
-            } catch { /* Similarly, ignore unknown burn error for now */ }
+            } catch {
+                /* Similarly, ignore unknown burn error for now */
+            }
         }
-        
+
         // The amounts reported in LiquidityOperation REMOVE are what was collected.
         // The 'success' flag should reflect if both decrease (if applicable) and collect were successful.
         emit LiquidityOperation(
@@ -425,7 +509,7 @@ contract PredictiveLiquidityManager is
             mintCallSuccess = true; // The call itself succeeded
         } catch Error(string memory reason) {
             // mintCallSuccess remains false
-             revert(string(abi.encodePacked("PLM: Mint failed - ", reason)));
+            revert(string(abi.encodePacked("PLM: Mint failed - ", reason)));
         } catch {
             // mintCallSuccess remains false
             revert("PLM: Mint failed with unknown error");
@@ -441,13 +525,13 @@ contract PredictiveLiquidityManager is
             );
         } else {
             // If liquidity is 0 but a tokenId was created (should not happen if mint reverts on 0 liquidity), burn it.
-            if (mintCallSuccess && tokenIdMinted != 0) { 
+            if (mintCallSuccess && tokenIdMinted != 0) {
                 try positionManager.burn(tokenIdMinted) {} catch {}
             }
             currentPosition = Position(0, 0, 0, 0, false);
             mintCallSuccess = false; // Mark as overall not successful if no liquidity
         }
-        
+
         emit LiquidityOperation(
             "MINT",
             tokenIdMinted,
@@ -458,9 +542,9 @@ contract PredictiveLiquidityManager is
             amount1Actual,
             mintCallSuccess && liquidityMinted > 0 // Success only if liquidity > 0
         );
-        
+
         if (!(mintCallSuccess && liquidityMinted > 0)) {
-             // If mint didn't result in liquidity, ensure position is marked inactive
+            // If mint didn't result in liquidity, ensure position is marked inactive
             currentPosition = Position(0, 0, 0, 0, false);
         }
     }
@@ -502,7 +586,8 @@ contract PredictiveLiquidityManager is
     ) external override {
         // data parameter is unused, marked as warning by compiler, acceptable for override
         require(
-            msg.sender == address(positionManager) || msg.sender == factory.getPool(token0, token1, fee), // Callback can be from pool too
+            msg.sender == address(positionManager) ||
+                msg.sender == factory.getPool(token0, token1, fee), // Callback can be from pool too
             "PLM: Unauthorized callback"
         );
         if (amount0Owed > 0) {

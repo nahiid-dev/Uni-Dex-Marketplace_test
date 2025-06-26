@@ -1,4 +1,3 @@
-
 # predictive_test.py (FINAL-FIXED for web3 v5.x and All Syntax)
 import os
 import sys
@@ -39,6 +38,7 @@ TWO_POW_96 = Decimal(2**96)
 MIN_TICK_CONST = -887272
 MAX_TICK_CONST = 887272
 UNISWAP_V3_ROUTER_ADDRESS = "0xE592427A0AEce92De3Edee1F18E0157C05861564" # Mainnet Router
+DEFAULT_NUM_SWAPS = 20  # ????? ??????? ???????
 
 TOKEN_MANAGER_OPTIMIZED_ADDRESS_ENV = os.getenv('TOKEN_MANAGER_OPTIMIZED_ADDRESS')
 
@@ -101,7 +101,8 @@ class PredictiveTest(LiquidityTestBase):
             'predictedTick_calculated': None,
             'actualPrice_pool': None,
             'fees_collected_token0_via_collect_only': None,
-            'fees_collected_token1_via_collect_only': None
+            'fees_collected_token1_via_collect_only': None,
+            'num_swaps_executed': 0  # ????? ???? ????? ???? ???? ????? ???????? ???? ???
         }
         final_metrics = {**base_metrics, **predictive_metrics}
         original_keys_defaults = {
@@ -403,12 +404,11 @@ class PredictiveTest(LiquidityTestBase):
             logger.warning(f"Could not read contract token balances individually: {e}")
         return balance0_wei, balance1_wei
 
-    def _perform_swap_for_fees(self, funding_account, private_key_env, swap_token_in_addr: str, swap_token_out_addr: str, swap_amount_readable: Decimal, token_in_decimals: int, token_out_decimals: int):
+    def _perform_swap_for_fees(self, funding_account, private_key_env, swap_token_in_addr: str, swap_token_out_addr: str, swap_amount_readable: Decimal, token_in_decimals: int, token_out_decimals: int, num_swaps: int = DEFAULT_NUM_SWAPS):
         """
-        Performs a swap directly via the Uniswap V3 Router to generate fees.
-        This bypasses the TokenManagerOptimized contract to avoid potential issues.
+        Performs multiple swaps directly via the Uniswap V3 Router with a single approve to generate fees.
         """
-        logger.info(f"Attempting swap directly via Uniswap Router: {swap_amount_readable} of {swap_token_in_addr} for {swap_token_out_addr}.")
+        logger.info(f"Attempting {num_swaps} swaps via Uniswap Router: {swap_amount_readable} of {swap_token_in_addr} for {swap_token_out_addr} each.")
 
         try:
             # Get contracts
@@ -418,48 +418,78 @@ class PredictiveTest(LiquidityTestBase):
                 logger.error("Failed to get Router or Token contract instance for swap.")
                 return False
 
-            amount_to_swap_wei = int(swap_amount_readable * (Decimal(10) ** token_in_decimals))
+            # Calculate total amount needed for all swaps
+            single_swap_amount_wei = int(swap_amount_readable * (Decimal(10) ** token_in_decimals))
+            total_amount_wei = single_swap_amount_wei * num_swaps
             pool_fee_for_swap = self.contract.functions.fee().call()
 
-            # 1. Approve the router to spend the tokens from the funding account
-            logger.info(f"Approving Uniswap Router ({UNISWAP_V3_ROUTER_ADDRESS}) to spend {swap_amount_readable} of token {swap_token_in_addr}...")
+            # 1. Single approve for all swaps
+            logger.info(f"Approving Uniswap Router ({UNISWAP_V3_ROUTER_ADDRESS}) to spend {total_amount_wei} wei of token {swap_token_in_addr}...")
             
             current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address)
-            approve_tx_params = {'from': funding_account.address, 'nonce': current_nonce, 'gas': 100000}
+            approve_tx_params = {
+                'from': funding_account.address, 
+                'nonce': current_nonce, 
+                'gas': 100000  # Fixed gas for approve
+            }
             
-            built_approve_tx = token_in_contract.functions.approve(UNISWAP_V3_ROUTER_ADDRESS, amount_to_swap_wei).build_transaction(approve_tx_params)
+            built_approve_tx = token_in_contract.functions.approve(
+                UNISWAP_V3_ROUTER_ADDRESS, 
+                total_amount_wei
+            ).build_transaction(approve_tx_params)
+            
             receipt_approve = web3_utils.send_transaction(built_approve_tx, private_key_env)
 
             if not receipt_approve or receipt_approve.status == 0:
                 logger.error(f"Failed to approve Uniswap Router. Receipt: {receipt_approve}")
                 return False
-            logger.info(f"Uniswap Router approved. Tx: {receipt_approve.transactionHash.hex()}")
-
-            # 2. Perform the swap using exactInputSingle on the router
-            logger.info(f"Calling exactInputSingle on Uniswap Router...")
             
-            current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address)
-            swap_params = {
-                'tokenIn': Web3.to_checksum_address(swap_token_in_addr),
-                'tokenOut': Web3.to_checksum_address(swap_token_out_addr),
-                'fee': pool_fee_for_swap,
-                'recipient': funding_account.address, # Swapped tokens go back to the funding account
-                'deadline': int(time.time()) + 600, # 10 minute deadline
-                'amountIn': amount_to_swap_wei,
-                'amountOutMinimum': 0, # For testing, we don't require a minimum output
-                'sqrtPriceLimitX96': 0 # No price limit
-            }
+            logger.info(f"Uniswap Router approved for total amount. Tx: {receipt_approve.transactionHash.hex()}")
 
-            swap_tx_params = {'from': funding_account.address, 'nonce': current_nonce, 'gas': 500000}
-            built_swap_tx = router_contract.functions.exactInputSingle(swap_params).build_transaction(swap_tx_params)
-            receipt_swap = web3_utils.send_transaction(built_swap_tx, private_key_env)
+            # 2. Perform multiple swaps
+            successful_swaps = 0
+            
+            for i in range(num_swaps):
+                logger.info(f"--- Performing Swap {i + 1}/{num_swaps} ---")
+                
+                current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address)
+                swap_params = {
+                    'tokenIn': Web3.to_checksum_address(swap_token_in_addr),
+                    'tokenOut': Web3.to_checksum_address(swap_token_out_addr),
+                    'fee': pool_fee_for_swap,
+                    'recipient': funding_account.address,
+                    'deadline': int(time.time()) + 600,
+                    'amountIn': single_swap_amount_wei,
+                    'amountOutMinimum': 0,
+                    'sqrtPriceLimitX96': 0
+                }
 
-            if receipt_swap and receipt_swap.status == 1:
-                logger.info(f"Swap via Uniswap Router successful. Tx: {receipt_swap.transactionHash.hex()}")
-                return True
-            else:
-                logger.error(f"Swap via Uniswap Router failed. Receipt: {receipt_swap}")
-                return False
+                swap_tx_params = {
+                    'from': funding_account.address,
+                    'nonce': current_nonce,
+                    'gas': 200000  # Reduced gas for subsequent swaps
+                }
+                
+                try:
+                    built_swap_tx = router_contract.functions.exactInputSingle(swap_params).build_transaction(swap_tx_params)
+                    receipt_swap = web3_utils.send_transaction(built_swap_tx, private_key_env)
+
+                    if receipt_swap and receipt_swap.status == 1:
+                        successful_swaps += 1
+                        logger.info(f"Swap {i + 1} successful. Tx: {receipt_swap.transactionHash.hex()}")
+                    else:
+                        logger.warning(f"Swap {i + 1} failed. Continuing with next swaps...")
+                        
+                except Exception as e:
+                    logger.warning(f"Error in swap {i + 1}: {str(e)}. Continuing...")
+                
+                # Small delay between swaps
+                time.sleep(1)
+
+            logger.info(f"Completed {successful_swaps}/{num_swaps} swaps successfully.")
+            self.metrics['num_swaps_executed'] = successful_swaps
+            return successful_swaps > 0
+
         except Exception as e:
             logger.exception(f"Error during _perform_swap_for_fees (Direct Router Swap): {e}")
             return False
@@ -499,7 +529,6 @@ class PredictiveTest(LiquidityTestBase):
                 amount0_from_our_event, amount1_from_our_event = 0, 0
                 
                 # CORRECTED FOR WEB3 v5
-                #our_fee_event_logs = self.contract.events.FeesOnlyCollected.process_receipt(receipt)
                 our_fee_event_logs = self.contract.events.FeesOnlyCollected().process_receipt(receipt)
                 
                 if our_fee_event_logs:
@@ -660,10 +689,10 @@ class PredictiveTest(LiquidityTestBase):
             if stage_results['initial_adjustment']:
                 logger.info(f"\n--- STAGE 2: Simulating market activity ---")
 
-                NUM_SWAPS = 5
+                num_swaps = int(os.getenv('PREDICTIVE_NUM_SWAPS', DEFAULT_NUM_SWAPS))
                 swap_scenario = int(os.getenv('SWAP_SCENARIO', '0')) 
 
-                logger.info(f"\n--- STAGE 2: Simulating {NUM_SWAPS} swaps (Scenario: {swap_scenario}) ---")
+                logger.info(f"\n--- STAGE 2: Simulating {num_swaps} swaps (Scenario: {swap_scenario}) ---")
 
                 predicted_tick_for_trend = self.metrics.get('predictedTick_calculated')
                 _, current_tick_for_trend = self.get_pool_state()
@@ -674,7 +703,7 @@ class PredictiveTest(LiquidityTestBase):
                     logger.info("--> Manual Override: Forcing BEARISH trend (selling WETH for USDC).")
                     token_to_swap_in = self.token1
                     token_to_swap_out = self.token0
-                    amount_to_swap_readable = Decimal("2.5")
+                    amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '2.5'))
                     token_in_decimals = self.token1_decimals
                     token_out_decimals = self.token0_decimals
                     swap_direction_determined = True
@@ -682,7 +711,7 @@ class PredictiveTest(LiquidityTestBase):
                     logger.info("--> Manual Override: Forcing BULLISH trend (buying WETH with USDC).")
                     token_to_swap_in = self.token0
                     token_to_swap_out = self.token1
-                    amount_to_swap_readable = Decimal("50000")
+                    amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '50000'))
                     token_in_decimals = self.token0_decimals
                     token_out_decimals = self.token1_decimals
                     swap_direction_determined = True
@@ -692,13 +721,13 @@ class PredictiveTest(LiquidityTestBase):
                         if predicted_tick_for_trend > current_tick_for_trend:
                             logger.info(f"Simulating BULLISH trend: Moving price UP from {current_tick_for_trend} towards {predicted_tick_for_trend}")
                             token_to_swap_in, token_to_swap_out = self.token0, self.token1
-                            amount_to_swap_readable = Decimal("50000")
+                            amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '50000'))
                             token_in_decimals, token_out_decimals = self.token0_decimals, self.token1_decimals
                             swap_direction_determined = True
                         else:
                             logger.info(f"Simulating BEARISH trend: Moving price DOWN from {current_tick_for_trend} towards {predicted_tick_for_trend}")
                             token_to_swap_in, token_to_swap_out = self.token1, self.token0
-                            amount_to_swap_readable = Decimal("2.5")
+                            amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '2.5'))
                             token_in_decimals, token_out_decimals = self.token1_decimals, self.token0_decimals
                             swap_direction_determined = True
                     else:
@@ -707,26 +736,21 @@ class PredictiveTest(LiquidityTestBase):
                     logger.error(f"Invalid SWAP_SCENARIO: {swap_scenario}. Skipping swaps.")
 
                 if swap_direction_determined:
-                    all_swaps_successful = True
-                    for i in range(NUM_SWAPS):
-                        logger.info(f"--- Performing Trend Swap {i + 1}/{NUM_SWAPS} ---")
-                        if not self._perform_swap_for_fees(
-                            funding_account, private_key_env,
-                            token_to_swap_in, token_to_swap_out,
-                            amount_to_swap_readable,
-                            token_in_decimals, token_out_decimals
-                        ):
-                            logger.error(f"Trend swap {i + 1} failed, stopping simulation.")
-                            all_swaps_successful = False
-                            break
-                        time.sleep(1) 
-                    stage_results['swap'] = all_swaps_successful
+                    # ????? ??? ??????? ?? ?? approve
+                    swap_success = self._perform_swap_for_fees(
+                        funding_account, private_key_env,
+                        token_to_swap_in, token_to_swap_out,
+                        amount_to_swap_readable,
+                        token_in_decimals, token_out_decimals,
+                        num_swaps=num_swaps
+                    )
+                    stage_results['swap'] = swap_success
                 else:
                     stage_results['swap'] = False
 
                 if stage_results['swap']:
                     self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_SWAP_FEES"]
-                    logger.info(f"All {NUM_SWAPS} swaps completed successfully.")
+                    logger.info(f"All {num_swaps} swaps completed successfully.")
                 else:
                     self.metrics['action_taken'] = self.ACTION_STATES["SWAP_FOR_FEES_FAILED"]
                     self.metrics['error_message'] = (self.metrics.get('error_message', "") + ";Swap simulation failed or was skipped.").strip(';')
@@ -839,6 +863,7 @@ class PredictiveTest(LiquidityTestBase):
             'amount1_provided_to_mint',
             'fees_collected_token0',
             'fees_collected_token1',
+            'num_swaps_executed',  # ????? ???? ???? ????
             'gas_used', 'gas_cost_eth', 'error_message'
         ]
         
@@ -856,7 +881,7 @@ class PredictiveTest(LiquidityTestBase):
                             'fees_collected_token0_via_collect_only',
                             'fees_collected_token1_via_collect_only',
                             'gas_used', 'gas_cost_eth', 'range_width_multiplier_setting',
-                            'predictedTick_calculated']:
+                            'predictedTick_calculated', 'num_swaps_executed']:
                     row_data[col] = 0 if col not in ['predictedPrice_api', 'external_api_eth_price'] else ""
                 elif col not in ['tx_hash', 'error_message', 'action_taken', 'contract_type', 'timestamp', 'actualPrice_pool', 'external_api_eth_price']:
                     row_data[col] = ""

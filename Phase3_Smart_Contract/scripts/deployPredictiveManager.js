@@ -11,42 +11,26 @@ async function main() {
     const POSITION_MANAGER_MAINNET = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
     const WETH_MAINNET = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
     const USDC_MAINNET = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Mainnet USDC (6 decimals)
-    const POOL_FEE = 3000; // Corrected Comment: This is the 0.3% fee tier for WETH/USDC
+    const POOL_FEE = 500; // 0.05% fee tier for WETH/USDC (as per your file)
     const INITIAL_RANGE_WIDTH_MULTIPLIER = 100; // Default or desired value
 
     const [deployer] = await hre.ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
     console.log("Account balance:", (await deployer.getBalance()).toString());
 
-    // --- START OF MODIFIED SECTION ---
-    // --- Verify Pool Existence with Enhanced Debugging ---
+    // --- Verify Pool Existence ---
     console.log(`Checking if the mainnet pool exists (WETH/USDC Fee: ${POOL_FEE})...`);
     const factory = await hre.ethers.getContractAt("IUniswapV3Factory", UNISWAP_V3_FACTORY_MAINNET);
     const token0ForPool = USDC_MAINNET < WETH_MAINNET ? USDC_MAINNET : WETH_MAINNET;
     const token1ForPool = USDC_MAINNET < WETH_MAINNET ? WETH_MAINNET : USDC_MAINNET;
-
-    // Log the exact parameters to be 100% sure
-    console.log("Attempting getPool with:");
-    console.log("  Token0:", token0ForPool);
-    console.log("  Token1:", token1ForPool);
-    console.log("  Fee:", POOL_FEE);
-
-    let poolAddress;
-    try {
-        poolAddress = await factory.getPool(token0ForPool, token1ForPool, POOL_FEE);
-    } catch (e) {
-        console.error("FATAL: The 'getPool' call itself reverted! This is the root cause.");
-        console.error("Full error object:", e); // This will log the detailed error from Hardhat/Ethers
-        process.exit(1);
-    }
+    const poolAddress = await factory.getPool(token0ForPool, token1ForPool, POOL_FEE);
 
     if (poolAddress === "0x0000000000000000000000000000000000000000") {
-        console.error(`ERROR: Pool ${token0ForPool}/${token1ForPool} with fee ${POOL_FEE} does not exist on Mainnet Fork (getPool returned address 0).`);
+        console.error(`ERROR: Pool ${token0ForPool}/${token1ForPool} with fee ${POOL_FEE} does not exist on Mainnet Fork!`);
         process.exit(1);
     } else {
         console.log(`Pool exists on Mainnet Fork at: ${poolAddress}`);
     }
-    // --- END OF MODIFIED SECTION ---
 
     // --- Deploy PredictiveLiquidityManager ---
     console.log("\nDeploying PredictiveLiquidityManager...");

@@ -101,9 +101,9 @@ class LiquidityTestBase(ABC):
             logger.info(f"  Token0: {token0_name} at {self.token0} (Decimals: {self.token0_decimals})")
             logger.info(f"  Token1: {token1_name} at {self.token1} (Decimals: {self.token1_decimals})")
             if self.token0_decimals == 6 and self.token1_decimals == 18:
-                logger.info("✅ Token order verified: USDC(6) is token0, WETH(18) is token1")
+                logger.info("? Token order verified: USDC(6) is token0, WETH(18) is token1")
             else:
-                logger.warning(f"⚠️ Unexpected token decimals configuration: token0({self.token0_decimals}), token1({self.token1_decimals})")
+                logger.warning(f"?? Unexpected token decimals configuration: token0({self.token0_decimals}), token1({self.token1_decimals})")
             
             logger.info(f"Setup completed for {self.contract_name}")
             return True
@@ -224,7 +224,7 @@ class LiquidityTestBase(ABC):
         Calculates the human-readable price from sqrtPriceX96. For USDC/WETH pool:
         - token0 is USDC (6 decimals)
         - token1 is WETH (18 decimals)
-        - sqrtPriceX96 represents: √(token1/token0) * 2^96
+        - sqrtPriceX96 represents: v(token1/token0) * 2^96
         We need to:
         1. Convert sqrtPriceX96 to actual price ratio
         2. Invert the ratio since we want USDC/WETH not WETH/USDC
@@ -260,7 +260,7 @@ class LiquidityTestBase(ABC):
             logger.debug(f"  decimal_adjustment (10^({self.token0_decimals}-{self.token1_decimals})): {decimal_adjustment}")
             logger.debug(f"  final_price (USDC/WETH): {actual_price}")
 
-            # برگرداندن مقدار به صورت Decimal برای حفظ دقت اعشار
+            # ????????? ????? ?? ???? Decimal ???? ??? ??? ?????
             return actual_price
     
         except Exception as e:

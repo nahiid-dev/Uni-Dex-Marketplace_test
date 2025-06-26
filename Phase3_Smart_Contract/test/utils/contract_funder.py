@@ -2,7 +2,6 @@ import logging
 import time
 from web3 import Web3
 from eth_account import Account
-# این ایمپورت باید به ماژول web3_utils که در کنار آن قرار دارد، دسترسی داشته باشد
 from . import web3_utils
 
 logger = logging.getLogger(__name__)
@@ -23,13 +22,11 @@ def ensure_precise_token_balances(
     Ensures the target contract has precise amounts of token0 and token1.
     Funds from the funding_account.
     """
-    # [اصلاح شد] بررسی اتصال وب‌تری، چون تابع init_web3 این کار را انجام می‌دهد، این شرط حذف شد
     if not web3_utils.w3:
         if not web3_utils.init_web3():
             logger.error("Web3 connection failed in ensure_precise_token_balances.")
             return False
     
-    # حالا مطمئن هستیم که w3 از web3_utils در دسترس است
     w3 = web3_utils.w3
     if not w3:
         logger.error("Web3 instance is not available after initialization attempt.")
@@ -79,7 +76,6 @@ def ensure_precise_token_balances(
             tx_params_dict = {
                 'from': funder_checksum_addr,
                 'nonce': current_nonce,
-                # [اصلاح شد] استفاده از w3.eth.chain_id به جای w3.net.version
                 'chainId': w3.eth.chain_id 
             }
             

@@ -142,7 +142,7 @@ function deploy_contract() {
         if npx hardhat run "$script_path" --network localhost >> "$LOG_FILE" 2>&1; then
             # (ENHANCED from v2.4) More robust check for valid address file and content
             if [ -f "$address_file" ] && [[ "$(jq -r '.address' "$address_file" 2>/dev/null)" =~ ^0x[a-fA-F0-9]{40}$ ]]; then
-                log "✅ $contract_name deployed successfully!"
+                log "? $contract_name deployed successfully!"
                 return 0 # Success
             else
                 log "ERROR: Deployment script ran, but address file '$address_file' is missing or its content is invalid."
@@ -167,10 +167,10 @@ function run_python_test() {
     local test_name="$2"
     log "Running Python test: $test_name..."
     if python3 -u "$script_path" >> "$LOG_FILE" 2>&1; then
-        log "✅ $test_name test completed successfully."
+        log "? $test_name test completed successfully."
         return 0
     else
-        log "❌ ERROR: $test_name test failed. Check $LOG_FILE for traceback."
+        log "? ERROR: $test_name test failed. Check $LOG_FILE for traceback."
         return 1
     fi
 }
@@ -180,7 +180,7 @@ function run_python_test() {
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 log "=============================================="
-log "🚀 Starting DEX Fork Test Automation Script 🚀"
+log "?? Starting DEX Fork Test Automation Script ??"
 log "=============================================="
 
 # --- 1. SETUP ---
@@ -302,10 +302,10 @@ if type deactivate &> /dev/null && [[ -n "${VIRTUAL_ENV-}" ]]; then
 fi
 
 log "=============================================="
-log "🏁 Test Automation Script Completed 🏁"
+log "?? Test Automation Script Completed ??"
 log "=============================================="
-log "Predictive Test Result: $( [ $predictive_test_status -eq 0 ] && echo "✅ SUCCESS" || echo "❌ FAILURE" )"
-log "Baseline Test Result:   $( [ $baseline_test_status -eq 0 ] && echo "✅ SUCCESS" || echo "❌ FAILURE" )"
+log "Predictive Test Result: $( [ $predictive_test_status -eq 0 ] && echo "? SUCCESS" || echo "? FAILURE" )"
+log "Baseline Test Result:   $( [ $baseline_test_status -eq 0 ] && echo "? SUCCESS" || echo "? FAILURE" )"
 log "Detailed logs available in: $LOG_FILE"
 log "Hardhat node logs (if any issues): $HARDHAT_NODE_LOG_FILE"
 
