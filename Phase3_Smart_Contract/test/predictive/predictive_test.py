@@ -718,7 +718,7 @@ class PredictiveTest(LiquidityTestBase):
                 elif swap_scenario == 0:
                     logger.info("--> Automatic Mode: Simulating trend towards predicted price.")
                     if predicted_tick_for_trend is not None and current_tick_for_trend is not None:
-                        if predicted_tick_for_trend > current_tick_for_trend:
+                        if predicted_tick_for_trend < current_tick_for_trend:
                             logger.info(f"Simulating BULLISH trend: Moving price UP from {current_tick_for_trend} towards {predicted_tick_for_trend}")
                             token_to_swap_in, token_to_swap_out = self.token0, self.token1
                             amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '50000'))
@@ -937,8 +937,8 @@ def main():
         test_instance = PredictiveTest(predictive_address)
         
         desired_rwm = int(os.getenv('PREDICTIVE_RWM', '100'))
-        target_weth = float(os.getenv('PREDICTIVE_TARGET_WETH', '5.0'))
-        target_usdc = float(os.getenv('PREDICTIVE_TARGET_USDC', '10000.0'))
+        target_weth = float(os.getenv('PREDICTIVE_TARGET_WETH', '50.0'))
+        target_usdc = float(os.getenv('PREDICTIVE_TARGET_USDC', '1225000.0'))
 
         setup_success = test_instance.setup(desired_range_width_multiplier=desired_rwm)
         

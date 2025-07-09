@@ -603,7 +603,7 @@ class BaselineTest(LiquidityTestBase):
         
             # --- STAGE 2: Swap Simulation ---
             if stage_results['initial_adjustment']:
-                NUM_SWAPS = 5
+                NUM_SWAPS = 20
                 SWAP_AMOUNT_WETH = Decimal("2.5")
                 logger.info(f"\n--- STAGE 2: Baseline Strategy - Simulating {NUM_SWAPS} swaps to generate fees ---")
                 all_swaps_successful = True
@@ -696,23 +696,6 @@ class BaselineTest(LiquidityTestBase):
                             logger.warning("Baseline final tx successful & adjusted, but no PositionMinted event found.")
                     else: 
                         logger.info("Baseline final adjustment call successful but skipped on-chain position change.")
-                    
-                    if self.nft_manager_contract_for_events and was_adjusted_onchain_final:
-                        logger.info(f"Checking Uniswap NFPM Collect events for fees in FINAL Baseline Tx: {receipt_base_final.transactionHash.hex()} ...")
-                        
-                        # CORRECTED FOR WEB3 v5
-                        collect_logs_nfpm_final = self.nft_manager_contract_for_events.events.Collect().process_receipt(receipt_base_final)
-                        
-                        if not collect_logs_nfpm_final: logger.info(f"No NFPM Collect events found in FINAL Baseline Tx.")
-                        for nfpm_log_entry in collect_logs_nfpm_final:
-                            if nfpm_log_entry.args.recipient.lower() == self.contract_address.lower():
-                                logger.info(f"Uniswap NFPM Collect Event (FINAL Baseline Tx, TokenId={nfpm_log_entry.args.tokenId}): Amount0={nfpm_log_entry.args.amount0}, Amount1={nfpm_log_entry.args.amount1}")
-                                if self.metrics.get('fees_collected_token0') is None: self.metrics['fees_collected_token0'] = 0
-                                if self.metrics.get('fees_collected_token1') is None: self.metrics['fees_collected_token1'] = 0
-                                self.metrics['fees_collected_token0'] += nfpm_log_entry.args.amount0
-                                self.metrics['fees_collected_token1'] += nfpm_log_entry.args.amount1
-                                logger.info(f"Main fee metrics (Baseline fees_collected_token0/1) updated from FINAL Tx NFPM Collect: ({self.metrics['fees_collected_token0']}, {self.metrics['fees_collected_token1']})")
-                                break
                 else:
                     raise Exception("Final adjustment transaction failed")
 
@@ -818,8 +801,8 @@ def main():
         test_baseline = BaselineTest(baseline_address_val)
         
         desired_rwm_base = int(os.getenv('BASELINE_RWM', '100'))
-        target_weth_for_test = float(os.getenv('BASELINE_TARGET_WETH', '5.0'))
-        target_usdc_for_test = float(os.getenv('BASELINE_TARGET_USDC', '10000.0'))
+        target_weth_for_test = float(os.getenv('BASELINE_TARGET_WETH', '50.0'))
+        target_usdc_for_test = float(os.getenv('BASELINE_TARGET_USDC', '1225000.0'))
         
         # 1. Call setup with its specific parameter
         setup_success = test_baseline.setup(desired_range_width_multiplier=desired_rwm_base)
