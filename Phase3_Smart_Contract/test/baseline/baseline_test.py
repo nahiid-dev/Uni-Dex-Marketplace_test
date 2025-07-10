@@ -604,7 +604,7 @@ class BaselineTest(LiquidityTestBase):
             # --- STAGE 2: Swap Simulation ---
             if stage_results['initial_adjustment']:
                 NUM_SWAPS = 20
-                SWAP_AMOUNT_WETH = Decimal("2.5")
+                SWAP_AMOUNT_WETH = Decimal("11.5")
                 logger.info(f"\n--- STAGE 2: Baseline Strategy - Simulating {NUM_SWAPS} swaps to generate fees ---")
                 all_swaps_successful = True
                 i = 0
@@ -800,9 +800,9 @@ def main():
         
         test_baseline = BaselineTest(baseline_address_val)
         
-        desired_rwm_base = int(os.getenv('BASELINE_RWM', '100'))
+        desired_rwm_base = int(os.getenv('BASELINE_RWM', '20'))
         target_weth_for_test = float(os.getenv('BASELINE_TARGET_WETH', '50.0'))
-        target_usdc_for_test = float(os.getenv('BASELINE_TARGET_USDC', '1225000.0'))
+        target_usdc_for_test = float(os.getenv('BASELINE_TARGET_USDC', '2000000.0'))
         
         # 1. Call setup with its specific parameter
         setup_success = test_baseline.setup(desired_range_width_multiplier=desired_rwm_base)

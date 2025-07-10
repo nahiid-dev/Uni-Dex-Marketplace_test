@@ -1,0 +1,94 @@
+S D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis> py deep_fee.py
+Plots will be saved in: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results
+✅ CSV Files loaded successfully.
+
+--- Predictive DataFrame Head (Post-Analysis) ---
+            timestamp  actualPrice_pool  predictedPrice_api  ...       v_lp_usd  is_in_range  v_fees_usd
+0 2025-07-09 10:43:01         2619.9081           2630.9318  ...  219297.416610         True      2.9500
+1 2025-07-09 12:07:04         2630.9811           2642.8869  ...  214549.096339         True      2.9454
+2 2025-07-09 16:07:02         2659.2828           2671.4096  ...  215562.548650         True      2.7264
+3 2025-07-09 17:50:20         2659.8347           2686.3735  ...  181676.187820         True      2.4926
+4 2025-07-09 20:07:03         2767.4508           2756.7112  ...  272170.985981         True      4.2591
+
+[5 rows x 9 columns]
+--- Predictive 'actualPrice_pool' Stats (Post-Analysis) ---
+count       7.000000
+mean     2698.698143
+std        71.629597
+min      2619.908100
+25%      2645.131950
+50%      2659.834700
+75%      2770.236150
+max      2780.408000
+Name: actualPrice_pool, dtype: float64
+-----------------------------------------------------
+
+
+--- Baseline DataFrame Head (Post-Analysis) ---
+            timestamp  actualPrice_pool  finalTickLower_contract_WETHUSDC_price  ...       v_lp_usd  is_in_range  v_fees_usd
+0 2025-07-09 10:43:49         2616.3398                               2678.4887  ...  538101.464735         True      4.0476
+1 2025-07-09 12:07:51         2627.3243                               2691.9140  ...  522840.136052         True      4.2864
+2 2025-07-09 16:07:48         2655.8776                               2718.9668  ...  546633.768848         True      3.9552
+3 2025-07-09 17:51:06         2656.1432                               2718.9668  ...  547631.504052         True      4.2631
+4 2025-07-09 20:07:49         2763.0658                               2829.9243  ...  553761.505156         True      5.0242
+
+[5 rows x 8 columns]
+--- Baseline 'actualPrice_pool' Stats (Post-Analysis) ---
+count       7.000000
+mean     2694.754729
+std        71.189256
+min      2616.339800
+25%      2641.600950
+50%      2656.143200
+75%      2765.830350
+max      2775.937500
+Name: actualPrice_pool, dtype: float64
+-----------------------------------------------------
+
+--- Results Summary Table ---
+                                 Metric Predictive Strategy Baseline Strategy
+                      Time In Range (%)              100.00            100.00
+                   Total Gas Cost (ETH)            0.005789          0.012643
+              Mean Absolute Error (MAE)               14.05               N/A
+Mean Absolute Percentage Error (MAPE %)                0.52               N/A
+                 Average LP Value (USD)           220976.06         547802.37
+                   Final LP Value (USD)           207116.04         570931.53
+           Total Impermanent Loss (USD)               33.01            121.51
+         Average Impermanent Loss (USD)                4.72             17.36
+                Total Fees Earned (USD)               22.39             31.81
+                   Total Gas Cost (USD)               15.69             34.24
+                  Net P&L vs HODL (USD)              -26.31           -123.94
+      Final Cumulative Actual P&L (USD)             8026.41           7954.82
+               % Periods Ended In Range              100.00            100.00
+ Final Cumulative Net Holding P&L (USD)             4889.68           7655.60
+
+N/A = Not Applicable or Not Calculated for this strategy.
+Note on P&L metrics: 'Actual P&L' reflects overall portfolio value change including fees and gas. 'Net Holding P&L' focuses on the P&L from LP value changes minus gas for each position's holding period.
+Plot01 - Row 0: Using PreConverted Range -> PriceL=2563.196, PriceU=2697.303
+Plot01 - Row 1: Using PreConverted Range -> PriceL=2576.0434, PriceU=2710.8226
+Plot01 - Row 2: Using PreConverted Range -> PriceL=2604.5349, PriceU=2740.8047
+Plot01 - Row 3: Using PreConverted Range -> PriceL=2620.2083, PriceU=2757.2982
+Plot01 - Row 4: Using PreConverted Range -> PriceL=2694.6071, PriceU=2835.5896
+Plot01 Y-axis limits set to: (2435.04, 3016.33)
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\01_predictive_price_liquidity.png
+Plot02 - Row 0: Using PreConverted Range -> PriceL=2547.8636, PriceU=2678.4887
+Plot02 - Row 1: Using PreConverted Range -> PriceL=2560.6342, PriceU=2691.914
+Plot02 - Row 2: Using PreConverted Range -> PriceL=2586.3677, PriceU=2718.9668
+Plot02 - Row 3: Using PreConverted Range -> PriceL=2586.3677, PriceU=2718.9668
+Plot02 - Row 4: Using PreConverted Range -> PriceL=2691.914, PriceU=2829.9243
+Plot02 Y-axis limits set to: (2420.47, 2983.33)
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\02_baseline_price_liquidity.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\03_prediction_error.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\04_actual_vs_predicted_price.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\05_rolling_time_in_range.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\06_cumulative_gas_costs_eth.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\07_lp_value_over_time.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\08_impermanent_loss_over_time.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\09_pnl_vs_hodl_per_period.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\10_cumulative_actual_pnl.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\11_cumulative_net_holding_pnl.png
+Plot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\12_percent_periods_ended_in_range.pngPlot saved: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\13_distribution_impermanent_loss.png
+Summary table saved as D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\summary_table.png
+
+All plots and table have been saved to the 'plots_results' directory.
+(venv) PS D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis> 

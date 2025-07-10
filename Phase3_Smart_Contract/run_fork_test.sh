@@ -245,10 +245,10 @@ log "Exporting settings for Predictive test..."
 export PREDICTIVE_MANAGER_ADDRESS=$(jq -r '.address' "$ADDRESS_FILE_PREDICTIVE")
 # === SETTINGS FOR PREDICTIVE TEST ===
 export PREDICTIVE_TARGET_WETH="50.0"
-export PREDICTIVE_TARGET_USDC="1225000.0"
+export PREDICTIVE_TARGET_USDC="2000000.0"
 export PREDICTIVE_NUM_SWAPS="20"
-export PREDICTIVE_SWAP_AMOUNT_ETH="2.0"
-export PREDICTIVE_SWAP_AMOUNT_USDC="5500.0" # Approx. 2 ETH
+export PREDICTIVE_SWAP_AMOUNT_ETH="11.5"
+export PREDICTIVE_SWAP_AMOUNT_USDC="32200" # 11.5 WETH * 2800 $/WETH
 # ====================================
 
 log "Running Python test script for Predictive Strategy..."
@@ -288,7 +288,8 @@ log "Exporting settings for Baseline test..."
 export BASELINE_MINIMAL_ADDRESS=$(jq -r '.address' "$ADDRESS_FILE_BASELINE")
 # === SETTINGS FOR BASELINE TEST ===
 export BASELINE_TARGET_WETH="50.0"
-export BASELINE_TARGET_USDC="1225000.0"
+export BASELINE_TARGET_USDC="2000000.0"
+export BASELINE_RWM="20"
 # NOTE: Edit baseline_test.py to use these variables for swap count and amount.
 # ==================================
 

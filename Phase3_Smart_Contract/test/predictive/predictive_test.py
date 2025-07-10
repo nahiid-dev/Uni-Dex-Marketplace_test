@@ -703,7 +703,7 @@ class PredictiveTest(LiquidityTestBase):
                     logger.info("--> Manual Override: Forcing BEARISH trend (selling WETH for USDC).")
                     token_to_swap_in = self.token1
                     token_to_swap_out = self.token0
-                    amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '2.5'))
+                    amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '11.5'))
                     token_in_decimals = self.token1_decimals
                     token_out_decimals = self.token0_decimals
                     swap_direction_determined = True
@@ -711,7 +711,7 @@ class PredictiveTest(LiquidityTestBase):
                     logger.info("--> Manual Override: Forcing BULLISH trend (buying WETH with USDC).")
                     token_to_swap_in = self.token0
                     token_to_swap_out = self.token1
-                    amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '50000'))
+                    amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '32200'))
                     token_in_decimals = self.token0_decimals
                     token_out_decimals = self.token1_decimals
                     swap_direction_determined = True
@@ -721,13 +721,13 @@ class PredictiveTest(LiquidityTestBase):
                         if predicted_tick_for_trend < current_tick_for_trend:
                             logger.info(f"Simulating BULLISH trend: Moving price UP from {current_tick_for_trend} towards {predicted_tick_for_trend}")
                             token_to_swap_in, token_to_swap_out = self.token0, self.token1
-                            amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '50000'))
+                            amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '32200'))
                             token_in_decimals, token_out_decimals = self.token0_decimals, self.token1_decimals
                             swap_direction_determined = True
                         else:
                             logger.info(f"Simulating BEARISH trend: Moving price DOWN from {current_tick_for_trend} towards {predicted_tick_for_trend}")
                             token_to_swap_in, token_to_swap_out = self.token1, self.token0
-                            amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '2.5'))
+                            amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '11.5'))
                             token_in_decimals, token_out_decimals = self.token1_decimals, self.token0_decimals
                             swap_direction_determined = True
                     else:
@@ -936,9 +936,9 @@ def main():
 
         test_instance = PredictiveTest(predictive_address)
         
-        desired_rwm = int(os.getenv('PREDICTIVE_RWM', '100'))
+        desired_rwm = int(os.getenv('PREDICTIVE_RWM', '20'))
         target_weth = float(os.getenv('PREDICTIVE_TARGET_WETH', '50.0'))
-        target_usdc = float(os.getenv('PREDICTIVE_TARGET_USDC', '1225000.0'))
+        target_usdc = float(os.getenv('PREDICTIVE_TARGET_USDC', '2000000.0'))
 
         setup_success = test_instance.setup(desired_range_width_multiplier=desired_rwm)
         
