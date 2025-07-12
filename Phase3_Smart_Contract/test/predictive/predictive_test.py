@@ -685,77 +685,56 @@ class PredictiveTest(LiquidityTestBase):
                 self.metrics['action_taken'] = self.ACTION_STATES["TX_REVERTED"] if receipt_initial else self.ACTION_STATES["TX_WAIT_FAILED"]
                 raise Exception("Initial adjustment transaction failed") # Raise exception to enter finally block
         
-            # --- STAGE 2: Market Simulation based on selected scenario ---
+            # ------------------- Replace with this new code block -------------------
+            # --- STAGE 2: Market Making Simulation ---
             if stage_results['initial_adjustment']:
-                logger.info(f"\n--- STAGE 2: Simulating market activity ---")
+                logger.info(f"\n--- STAGE 2: Simulating Market Activity ---")
 
-                num_swaps = int(os.getenv('PREDICTIVE_NUM_SWAPS', DEFAULT_NUM_SWAPS))
-                swap_scenario = int(os.getenv('SWAP_SCENARIO', '0')) 
+                # Read main parameters from environment variables
+                num_swaps = int(os.getenv('PREDICTIVE_NUM_SWAPS', '20'))
+                swap_amount_eth = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '11.5'))
+                swap_amount_usdc = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '32200'))
 
-                logger.info(f"\n--- STAGE 2: Simulating {num_swaps} swaps (Scenario: {swap_scenario}) ---")
-
-                predicted_tick_for_trend = self.metrics.get('predictedTick_calculated')
-                _, current_tick_for_trend = self.get_pool_state()
+                # Determine the market trend based on the prediction
+                predicted_tick = self.metrics.get('predictedTick_calculated')
+                _, current_tick = self.get_pool_state()
                 
-                swap_direction_determined = False
+                # If the predicted tick is lower, the trend is bullish (due to inverse price/tick relationship)
+                is_bullish_trend = predicted_tick < current_tick
                 
-                if swap_scenario == 1:
-                    logger.info("--> Manual Override: Forcing BEARISH trend (selling WETH for USDC).")
-                    token_to_swap_in = self.token1
-                    token_to_swap_out = self.token0
-                    amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '11.5'))
-                    token_in_decimals = self.token1_decimals
-                    token_out_decimals = self.token0_decimals
-                    swap_direction_determined = True
-                elif swap_scenario == 2:
-                    logger.info("--> Manual Override: Forcing BULLISH trend (buying WETH with USDC).")
-                    token_to_swap_in = self.token0
-                    token_to_swap_out = self.token1
-                    amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '32200'))
-                    token_in_decimals = self.token0_decimals
-                    token_out_decimals = self.token1_decimals
-                    swap_direction_determined = True
-                elif swap_scenario == 0:
-                    logger.info("--> Automatic Mode: Simulating trend towards predicted price.")
-                    if predicted_tick_for_trend is not None and current_tick_for_trend is not None:
-                        if predicted_tick_for_trend < current_tick_for_trend:
-                            logger.info(f"Simulating BULLISH trend: Moving price UP from {current_tick_for_trend} towards {predicted_tick_for_trend}")
-                            token_to_swap_in, token_to_swap_out = self.token0, self.token1
-                            amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_USDC', '32200'))
-                            token_in_decimals, token_out_decimals = self.token0_decimals, self.token1_decimals
-                            swap_direction_determined = True
-                        else:
-                            logger.info(f"Simulating BEARISH trend: Moving price DOWN from {current_tick_for_trend} towards {predicted_tick_for_trend}")
-                            token_to_swap_in, token_to_swap_out = self.token1, self.token0
-                            amount_to_swap_readable = Decimal(os.getenv('PREDICTIVE_SWAP_AMOUNT_ETH', '11.5'))
-                            token_in_decimals, token_out_decimals = self.token1_decimals, self.token0_decimals
-                            swap_direction_determined = True
-                    else:
-                        logger.error("Auto scenario failed: Cannot determine trend without predicted/current ticks.")
-                else:
-                    logger.error(f"Invalid SWAP_SCENARIO: {swap_scenario}. Skipping swaps.")
+                trend_string = "BULLISH" if is_bullish_trend else "BEARISH"
+                logger.info(f"--> Automatic Mode: Simulating {trend_string} trend towards predicted tick {predicted_tick}")
 
-                if swap_direction_determined:
-                    # ????? ??? ??????? ?? ?? approve
-                    swap_success = self._perform_swap_for_fees(
-                        funding_account, private_key_env,
-                        token_to_swap_in, token_to_swap_out,
-                        amount_to_swap_readable,
-                        token_in_decimals, token_out_decimals,
-                        num_swaps=num_swaps
-                    )
-                    stage_results['swap'] = swap_success
-                else:
-                    stage_results['swap'] = False
+                # Set tokens and amounts based on the determined trend
+                token_in = self.token0 if is_bullish_trend else self.token1
+                token_out = self.token1 if is_bullish_trend else self.token0
+                amount_to_swap = swap_amount_usdc if is_bullish_trend else swap_amount_eth
+                decimals_in = self.token0_decimals if is_bullish_trend else self.token1_decimals
+                decimals_out = self.token1_decimals if is_bullish_trend else self.token0_decimals
 
-                if stage_results['swap']:
-                    self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_SWAP_FEES"]
-                    logger.info(f"All {num_swaps} swaps completed successfully.")
-                else:
+                # Call the market-making function only ONCE with the desired number of swaps
+                # Note: The function name _perform_swap_for_fees is slightly misleading as it performs multiple swaps.
+                swap_success = self._perform_swap_for_fees(
+                    funding_account, 
+                    private_key_env,
+                    token_in, 
+                    token_out,
+                    amount_to_swap,
+                    decimals_in,
+                    decimals_out,
+                    num_swaps=num_swaps  # Pass the total number of swaps to the function
+                )
+                
+                stage_results['swap'] = swap_success
+                self.metrics['num_swaps_executed'] = num_swaps if swap_success else 0
+
+                if not swap_success:
                     self.metrics['action_taken'] = self.ACTION_STATES["SWAP_FOR_FEES_FAILED"]
-                    self.metrics['error_message'] = (self.metrics.get('error_message', "") + ";Swap simulation failed or was skipped.").strip(';')
-                    raise Exception("Swap simulation failed")
-
+                    raise Exception("Swap simulation failed.")
+                else:
+                    self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_SWAP_FEES"]
+                    logger.info(f"Swap simulation with {num_swaps} swaps completed successfully.")
+            # --------------------------------------------------------------------
             # --- STAGE 2.5: Explicitly Collect Fees ---
             if stage_results['initial_adjustment'] and stage_results['swap']:
                 logger.info("\n--- STAGE 2.5: Predictive Strategy - Explicit Fee Collection ---")
