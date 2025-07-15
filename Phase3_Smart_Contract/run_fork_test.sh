@@ -247,8 +247,8 @@ export PREDICTIVE_MANAGER_ADDRESS=$(jq -r '.address' "$ADDRESS_FILE_PREDICTIVE")
 export PREDICTIVE_TARGET_WETH="50.0"
 export PREDICTIVE_TARGET_USDC="2000000.0"
 export PREDICTIVE_NUM_SWAPS="20"
-export PREDICTIVE_SWAP_AMOUNT_ETH="11.5"
-export PREDICTIVE_SWAP_AMOUNT_USDC="32200" # 11.5 WETH * 2800 $/WETH
+export PREDICTIVE_SWAP_AMOUNT_ETH="10"
+export PREDICTIVE_SWAP_AMOUNT_USDC="28000" # 10 WETH * 2800 $/WETH
 # ====================================
 
 log "Running Python test script for Predictive Strategy..."
