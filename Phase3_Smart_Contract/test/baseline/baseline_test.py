@@ -1,4 +1,4 @@
-# baseline_test.py (FINAL-FIXED with Original Logic and Safer Market Maker)
+# baseline_test.py (FINAL-FIXED with "Set and Forget" Logic and Safer Market Maker)
 import os
 import sys
 import json
@@ -708,15 +708,13 @@ class BaselineTest(LiquidityTestBase):
                 logger.info("Router pre-approved for both USDC and WETH.")
 
                 all_swaps_successful = True
+                realignment_swaps_performed = 0
+                volatility_swaps_performed = 0
                 
                 logger.info(f"--- Phase 1: Realigning price towards target tick: {predicted_tick} ---")
                 _, current_tick = self.get_pool_state()
 
                 for i in range(num_realignment_swaps):
-                    if abs(current_tick - predicted_tick) < 20:
-                        logger.info(f"Price is already close to the target tick. Skipping realignment.")
-                        break
-
                     if current_tick > predicted_tick:
                         logger.info(f"Realign Swap {i+1}/{num_realignment_swaps}: Current tick {current_tick} > target {predicted_tick}. Buying WETH.")
                         token_in, token_out = self.token0, self.token1
@@ -729,13 +727,13 @@ class BaselineTest(LiquidityTestBase):
                     if not self._perform_one_swap(funding_account, private_key_env, token_in, token_out, amount, decimals):
                         all_swaps_successful = False
                         break
-                    
+                    realignment_swaps_performed +=1
                     time.sleep(1)
                     _, current_tick = self.get_pool_state()
 
                 if not all_swaps_successful:
                     raise Exception("Market realignment (Phase 1) failed.")
-                logger.info(f"Phase 1 finished. Current tick: {current_tick}")
+                logger.info(f"Phase 1 finished after {realignment_swaps_performed} swaps. Current tick: {current_tick}")
 
                 logger.info(f"--- Phase 2: Generating focused volatility around tick {current_tick} ---")
                 for i in range(num_volatility_swaps):
@@ -744,20 +742,23 @@ class BaselineTest(LiquidityTestBase):
                     if not self._perform_one_swap(funding_account, private_key_env, self.token1, self.token0, volatility_swap_amount_eth, self.token1_decimals):
                         all_swaps_successful = False
                         break
+                    volatility_swaps_performed += 1
                     time.sleep(1)
                     
                     if not self._perform_one_swap(funding_account, private_key_env, self.token0, self.token1, volatility_swap_amount_usdc, self.token0_decimals):
                         all_swaps_successful = False
                         break
+                    volatility_swaps_performed += 1
                     time.sleep(1)
 
                 stage_results['swap'] = all_swaps_successful
+                self.metrics['num_swaps_executed'] = realignment_swaps_performed + volatility_swaps_performed
+
                 if not all_swaps_successful:
                     self.metrics['action_taken'] = self.ACTION_STATES["SWAP_FOR_FEES_FAILED"]
                     raise Exception("Focused volatility simulation (Phase 2) failed for Baseline test.")
                 else:
                     self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_SWAP_FEES"]
-                    self.metrics['num_swaps_executed'] = num_realignment_swaps + (num_volatility_swaps * 2)
 
             if stage_results['initial_adjustment'] and stage_results['swap']:
                 logger.info("\n--- STAGE 2.5: Baseline Strategy - Explicit Fee Collection ---")

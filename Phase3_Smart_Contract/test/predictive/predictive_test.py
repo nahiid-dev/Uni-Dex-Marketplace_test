@@ -1,4 +1,4 @@
-# predictive_test.py (FINAL-FIXED for web3 v5.x and All Syntax)
+# predictive_test.py (FINAL-FIXED with Consistent Swap Count)
 import os
 import sys
 import json
@@ -38,7 +38,6 @@ TWO_POW_96 = Decimal(2**96)
 MIN_TICK_CONST = -887272
 MAX_TICK_CONST = 887272
 UNISWAP_V3_ROUTER_ADDRESS = "0xE592427A0AEce92De3Edee1F18E0157C05861564" # Mainnet Router
-DEFAULT_NUM_SWAPS = 20
 
 TOKEN_MANAGER_OPTIMIZED_ADDRESS_ENV = os.getenv('TOKEN_MANAGER_OPTIMIZED_ADDRESS')
 
@@ -79,7 +78,6 @@ class PredictiveTest(LiquidityTestBase):
             "UNEXPECTED_ERROR": "unexpected_error",
             "TX_SUCCESS_ADJUSTED_INITIAL": "tx_success_adjusted_initial",
             "TX_SUCCESS_SWAP_FEES": "tx_success_swap_fees",
-            "TX_SUCCESS_ADJUSTED_FINAL": "tx_success_adjusted_final",
             "SWAP_FOR_FEES_FAILED": "swap_for_fees_failed",
             "FEES_COLLECT_ONLY_SUCCESS": "fees_collect_only_success",
             "FEES_COLLECT_ONLY_FAILED": "fees_collect_only_failed"
@@ -145,18 +143,18 @@ class PredictiveTest(LiquidityTestBase):
                 return False
 
             if self.nft_position_manager_address and self.nft_position_manager_address != ('0x' + '0'*40):
-                nft_manager_abi_collect_event = [{"anonymous": False, "inputs": [{"indexed": True, "internalType": "uint256", "name": "tokenId", "type": "uint256"},{"indexed": False, "internalType": "address", "name": "recipient", "type": "address"},{"indexed": False, "internalType": "uint256", "name": "amount0", "type": "uint256"},{"indexed": False, "internalType": "uint256", "name": "amount1", "type": "uint256"}],"name": "Collect","type": "event"}]
+                nft_manager_abi = json.loads('[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"tokenId","type":"uint256"},{"indexed":false,"internalType":"address","name":"recipient","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount0","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amount1","type":"uint256"}],"name":"Collect","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"tokenId","type":"uint256"},{"indexed":false,"internalType":"uint128","name":"liquidity","type":"uint128"},{"indexed":false,"internalType":"uint256","name":"amount0","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amount1","type":"uint256"}],"name":"IncreaseLiquidity","type":"event"}]')
                 try:
                     self.nft_manager_contract_for_events = web3_utils.w3.eth.contract(
                         address=self.nft_position_manager_address,
-                        abi=nft_manager_abi_collect_event
+                        abi=nft_manager_abi
                     )
-                    logger.info(f"PredictiveTest.setup: Initialized contract instance for INonfungiblePositionManager Collect events at {self.nft_position_manager_address}.")
+                    logger.info(f"PredictiveTest.setup: Initialized contract instance for INonfungiblePositionManager events at {self.nft_position_manager_address}.")
                 except Exception as e_init_nft_events:
-                    logger.error(f"PredictiveTest.setup: Failed to create contract instance for NFPM Collect events using address '{self.nft_position_manager_address}': {e_init_nft_events}")
+                    logger.error(f"PredictiveTest.setup: Failed to create contract instance for NFPM events using address '{self.nft_position_manager_address}': {e_init_nft_events}")
                     self.nft_manager_contract_for_events = None
             else:
-                logger.warning(f"PredictiveTest.setup: self.nft_position_manager_address is not validly set (value: {self.nft_position_manager_address}). Cannot initialize for NFPM Collect events.")
+                logger.warning(f"PredictiveTest.setup: self.nft_position_manager_address is not validly set. Cannot initialize for NFPM events.")
                 self.nft_manager_contract_for_events = None
 
             factory_address = self.contract.functions.factory().call()
@@ -287,7 +285,6 @@ class PredictiveTest(LiquidityTestBase):
             return None
 
     def calculate_tick_from_price(self, price: float) -> int | None:
-        """Calculate Uniswap V3 tick from a given price."""
         if self.token0_decimals is None or self.token1_decimals is None:
             logger.error("Token decimals not available for tick calculation. Ensure LiquidityTestBase.setup() was successful.")
             self.metrics['action_taken'] = self.ACTION_STATES["CALCULATION_FAILED"]
@@ -368,7 +365,6 @@ class PredictiveTest(LiquidityTestBase):
             if not self.metrics.get('error_message'): self.metrics['error_message'] = f"Metrics Update Error: {str(e)}"
 
     def sqrt_price_x96_to_price_token0_in_token1(self, sqrt_price_x96_str: str) -> Decimal:
-        """Convert sqrtPriceX96 to price of token0 in terms of token1 (USDC/WETH) - YOUR ORIGINAL FUNCTION"""
         sqrt_price_x96 = Decimal(sqrt_price_x96_str)
         if sqrt_price_x96 == Decimal(0): return Decimal(0)
         
@@ -388,7 +384,6 @@ class PredictiveTest(LiquidityTestBase):
         return price_t0_in_t1 / decimals_adjustment
 
     def _get_contract_token_balances_individually(self):
-        """Helper to get token balances individually for the contract."""
         balance0_wei, balance1_wei = 0, 0
         try:
             if self.token0:
@@ -403,9 +398,7 @@ class PredictiveTest(LiquidityTestBase):
             logger.warning(f"Could not read contract token balances individually: {e}")
         return balance0_wei, balance1_wei
 
-    # Add this new helper function inside the PredictiveTest class
     def _perform_one_swap(self, funding_account, private_key_env, token_in_addr: str, token_out_addr: str, amount_in_readable: Decimal, token_in_decimals: int) -> bool:
-        """Performs a single exact-input swap via the Uniswap V3 Router."""
         try:
             router_contract = web3_utils.get_contract(UNISWAP_V3_ROUTER_ADDRESS, "ISwapRouter")
             if not router_contract:
@@ -414,8 +407,6 @@ class PredictiveTest(LiquidityTestBase):
 
             amount_in_wei = int(amount_in_readable * (Decimal(10) ** token_in_decimals))
             pool_fee = self.contract.functions.fee().call()
-            
-            # Note: This function assumes the router is already approved to spend the token.
             
             current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address)
             swap_params = {
@@ -448,46 +439,6 @@ class PredictiveTest(LiquidityTestBase):
         except Exception as e:
             logger.exception(f"Error during _perform_one_swap: {e}")
             return False
-
-    # Replace the old _perform_swap_for_fees with this optimized version
-    def _perform_swap_for_fees(self, funding_account, private_key_env, swap_token_in_addr: str, swap_token_out_addr: str, swap_amount_readable: Decimal, token_in_decimals: int, token_out_decimals: int, num_swaps: int = DEFAULT_NUM_SWAPS):
-        """Performs multiple swaps by calling the single swap function in a loop."""
-        logger.info(f"Attempting a batch of {num_swaps} swaps via Uniswap Router...")
-        
-        # Approve the total amount needed for all swaps in this batch
-        try:
-            token_in_contract = web3_utils.get_contract(swap_token_in_addr, "IERC20")
-            total_amount_wei = int(swap_amount_readable * (Decimal(10) ** token_in_decimals)) * num_swaps
-            
-            approve_tx_params = {
-                'from': funding_account.address,
-                'nonce': web3_utils.w3.eth.get_transaction_count(funding_account.address),
-                'gas': 100000
-            }
-            built_approve_tx = token_in_contract.functions.approve(UNISWAP_V3_ROUTER_ADDRESS, total_amount_wei).build_transaction(approve_tx_params)
-            receipt_approve = web3_utils.send_transaction(built_approve_tx, private_key_env)
-            
-            if not receipt_approve or receipt_approve.status == 0:
-                logger.error(f"Approval for batch swap failed. Receipt: {receipt_approve}")
-                return False
-            logger.info(f"Router approved for total amount for batch swap. Tx: {receipt_approve.transactionHash.hex()}")
-        except Exception as e:
-            logger.exception(f"Error during approval for batch swap: {e}")
-            return False
-
-        # Perform swaps one by one
-        successful_swaps = 0
-        for i in range(num_swaps):
-            logger.info(f"--- Performing Batch Swap {i + 1}/{num_swaps} ---")
-            if self._perform_one_swap(funding_account, private_key_env, swap_token_in_addr, swap_token_out_addr, swap_amount_readable, token_in_decimals):
-                successful_swaps += 1
-                time.sleep(1) # Small delay
-            else:
-                logger.warning(f"A swap in the batch failed at iteration {i+1}. Stopping batch.")
-                break
-        
-        logger.info(f"Completed {successful_swaps}/{num_swaps} swaps in the batch.")
-        return successful_swaps == num_swaps
 
     def _call_collect_fees_only(self, funding_account, private_key_env) -> bool:
         logger.info("Attempting to call collectCurrentFeesOnly() on PredictiveLiquidityManager...")
@@ -523,8 +474,7 @@ class PredictiveTest(LiquidityTestBase):
                 
                 amount0_from_our_event, amount1_from_our_event = 0, 0
                 
-                # CORRECTED FOR WEB3 v5
-                our_fee_event_logs = self.contract.events.FeesOnlyCollected().process_receipt(receipt)
+                our_fee_event_logs = self.contract.events.FeesOnlyCollected().process_receipt(receipt, errors=DISCARD)
                 
                 if our_fee_event_logs:
                     log_args = our_fee_event_logs[0].args
@@ -540,7 +490,6 @@ class PredictiveTest(LiquidityTestBase):
                 self.metrics['fees_collected_token0_via_collect_only'] = amount0_from_our_event
                 self.metrics['fees_collected_token1_via_collect_only'] = amount1_from_our_event
                 
-                # Accumulate fees
                 if self.metrics.get('fees_collected_token0') is None: self.metrics['fees_collected_token0'] = 0
                 if self.metrics.get('fees_collected_token1') is None: self.metrics['fees_collected_token1'] = 0
                 self.metrics['fees_collected_token0'] += amount0_from_our_event
@@ -551,8 +500,7 @@ class PredictiveTest(LiquidityTestBase):
                 if self.nft_manager_contract_for_events:
                     logger.info(f"Checking Uniswap NFPM Collect events in Tx: {receipt.transactionHash.hex()} after collectCurrentFeesOnly call...")
                     
-                    # CORRECTED FOR WEB3 v5
-                    collect_logs_nfpm = self.nft_manager_contract_for_events.events.Collect().process_receipt(receipt)
+                    collect_logs_nfpm = self.nft_manager_contract_for_events.events.Collect().process_receipt(receipt, errors=DISCARD)
                     
                     found_nfpm_collect = False
                     for nfpm_log_entry in collect_logs_nfpm:
@@ -599,7 +547,7 @@ class PredictiveTest(LiquidityTestBase):
             sys.exit(1)
         
         funding_account = Account.from_key(private_key_env)
-        stage_results = {'initial_adjustment': False, 'swap': False, 'collect_only': False, 'final_adjustment': False}
+        stage_results = {'initial_adjustment': False, 'swap': False, 'collect_only': False}
         
         try:
             pos_info_before_all = self.get_position_info()
@@ -609,13 +557,13 @@ class PredictiveTest(LiquidityTestBase):
                 if 'currentLiquidity_contract' in self.metrics: self.metrics['currentLiquidity_contract'] = pos_info_before_all.get('liquidity', 0)
 
             # --- STAGE 1: Initial Position Adjustment by Strategy Contract ---
-            logger.info("\n--- STAGE 1: Predictive Strategy - Initial position adjustment ---")
-            predicted_price = self.get_predicted_price_from_api()
-            if predicted_price is None:
+            logger.info("\n--- STAGE 1: Predictive Strategy - Initial 'Set and Forget' position adjustment ---")
+            predicted_price_stage1 = self.get_predicted_price_from_api()
+            if predicted_price_stage1 is None:
                 self.save_metrics()
                 sys.exit(1)
-            predicted_tick = self.calculate_tick_from_price(predicted_price)
-            if predicted_tick is None:
+            predicted_tick_stage1 = self.calculate_tick_from_price(predicted_price_stage1)
+            if predicted_tick_stage1 is None:
                 self.save_metrics()
                 sys.exit(1)
             self.update_pool_and_position_metrics(final_update=False)
@@ -636,8 +584,8 @@ class PredictiveTest(LiquidityTestBase):
             self.metrics['initial_contract_balance_token1'] = balance1_val
             logger.info(f"Initial contract balances for metrics (after funding): Token0={balance0_val}, Token1={balance1_val}")
 
-            logger.info(f"Calling updatePredictionAndAdjust (initial) with predictedTick: {predicted_tick}")
-            tx_function_call_initial = self.contract.functions.updatePredictionAndAdjust(predicted_tick)
+            logger.info(f"Calling updatePredictionAndAdjust (initial) with predictedTick: {predicted_tick_stage1}")
+            tx_function_call_initial = self.contract.functions.updatePredictionAndAdjust(predicted_tick_stage1)
             current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address)
             tx_params_initial = {'from': funding_account.address, 'nonce': current_nonce, 'chainId': web3_utils.w3.eth.chain_id}
             try:
@@ -661,7 +609,7 @@ class PredictiveTest(LiquidityTestBase):
                 
                 logger.info("Processing LiquidityOperation event to capture mint amounts...")
                 try:
-                    mint_logs = self.contract.events.LiquidityOperation().process_receipt(receipt_initial)
+                    mint_logs = self.contract.events.LiquidityOperation().process_receipt(receipt_initial, errors=DISCARD)
                     for log in mint_logs:
                         if log.args.operationType == "MINT":
                             self.metrics['amount0_provided_to_mint'] = log.args.amount0
@@ -693,150 +641,84 @@ class PredictiveTest(LiquidityTestBase):
                 volatility_swap_amount_eth = Decimal(os.getenv('VOLATILITY_SWAP_AMOUNT_ETH', '15.0'))
                 volatility_swap_amount_usdc = Decimal(os.getenv('VOLATILITY_SWAP_AMOUNT_USDC', '45000'))
                 num_volatility_swaps = int(os.getenv('NUM_VOLATILITY_SWAPS', '10'))
+                num_realignment_swaps = 15
 
                 logger.info("Pre-approving router for all swaps in simulation...")
                 token0_contract = web3_utils.get_contract(self.token0, "IERC20")
                 token1_contract = web3_utils.get_contract(self.token1, "IERC20")
-                
-                total_usdc_to_approve = (realignment_swap_amount_usdc * 10) + (volatility_swap_amount_usdc * num_volatility_swaps)
-                total_weth_to_approve = (realignment_swap_amount_eth * 10) + (volatility_swap_amount_eth * num_volatility_swaps)
+
+                total_usdc_to_approve = (realignment_swap_amount_usdc * num_realignment_swaps) + (volatility_swap_amount_usdc * num_volatility_swaps)
+                total_weth_to_approve = (realignment_swap_amount_eth * num_realignment_swaps) + (volatility_swap_amount_eth * num_volatility_swaps)
 
                 approve_tx0 = token0_contract.functions.approve(UNISWAP_V3_ROUTER_ADDRESS, int(total_usdc_to_approve * 10**self.token0_decimals)).build_transaction({'from': funding_account.address, 'nonce': web3_utils.w3.eth.get_transaction_count(funding_account.address), 'gas': 100000})
                 web3_utils.send_transaction(approve_tx0, private_key_env)
-                
+
                 approve_tx1 = token1_contract.functions.approve(UNISWAP_V3_ROUTER_ADDRESS, int(total_weth_to_approve * 10**self.token1_decimals)).build_transaction({'from': funding_account.address, 'nonce': web3_utils.w3.eth.get_transaction_count(funding_account.address), 'gas': 100000})
                 web3_utils.send_transaction(approve_tx1, private_key_env)
                 logger.info("Router pre-approved for both USDC and WETH.")
 
                 all_swaps_successful = True
-
-                # --- Phase 1: Realigning price to the predicted range ---
-                logger.info(f"--- Phase 1: Realigning price to target tick: {predicted_tick} ---")
+                realignment_swaps_performed = 0
+                volatility_swaps_performed = 0
+                
+                logger.info(f"--- Phase 1: Realigning price towards target tick: {predicted_tick} ---")
                 _, current_tick = self.get_pool_state()
-
-                while abs(current_tick - predicted_tick) > 20:
+                
+                for i in range(num_realignment_swaps):
                     if current_tick > predicted_tick:
-                        logger.info(f"Current tick {current_tick} > target {predicted_tick}. Buying WETH to increase price.")
+                        logger.info(f"Realign Swap {i+1}/{num_realignment_swaps}: Current tick {current_tick} > target {predicted_tick}. Buying WETH.")
                         token_in, token_out = self.token0, self.token1
                         amount, decimals = realignment_swap_amount_usdc, self.token0_decimals
                     else:
-                        logger.info(f"Current tick {current_tick} < target {predicted_tick}. Selling WETH to decrease price.")
+                        logger.info(f"Realign Swap {i+1}/{num_realignment_swaps}: Current tick {current_tick} < target {predicted_tick}. Selling WETH.")
                         token_in, token_out = self.token1, self.token0
                         amount, decimals = realignment_swap_amount_eth, self.token1_decimals
-                        
+
                     if not self._perform_one_swap(funding_account, private_key_env, token_in, token_out, amount, decimals):
                         all_swaps_successful = False
                         break
-                    
+                    realignment_swaps_performed += 1
                     time.sleep(1)
                     _, current_tick = self.get_pool_state()
-
+                
                 if not all_swaps_successful:
                     raise Exception("Market realignment (Phase 1) failed.")
+                logger.info(f"Phase 1 finished after {realignment_swaps_performed} swaps. Current tick: {current_tick}")
 
-                # --- Phase 2: Generating focused volatility within the target range ---
                 logger.info(f"--- Phase 2: Generating focused volatility around tick {current_tick} ---")
                 for i in range(num_volatility_swaps):
                     logger.info(f"Volatility Swap Pair {i + 1}/{num_volatility_swaps}")
-                    
+
                     if not self._perform_one_swap(funding_account, private_key_env, self.token1, self.token0, volatility_swap_amount_eth, self.token1_decimals):
                         all_swaps_successful = False
                         break
+                    volatility_swaps_performed += 1
                     time.sleep(1)
-                    
+
                     if not self._perform_one_swap(funding_account, private_key_env, self.token0, self.token1, volatility_swap_amount_usdc, self.token0_decimals):
                         all_swaps_successful = False
                         break
+                    volatility_swaps_performed += 1
                     time.sleep(1)
 
                 stage_results['swap'] = all_swaps_successful
+                self.metrics['num_swaps_executed'] = realignment_swaps_performed + volatility_swaps_performed
+                
                 if not all_swaps_successful:
                     self.metrics['action_taken'] = self.ACTION_STATES["SWAP_FOR_FEES_FAILED"]
                     raise Exception("Focused volatility simulation (Phase 2) failed.")
                 else:
                     self.metrics['action_taken'] = self.ACTION_STATES["TX_SUCCESS_SWAP_FEES"]
-                    self.metrics['num_swaps_executed'] = num_volatility_swaps * 2                
-            # --- STAGE 2.5: Explicitly Collect Fees ---
+            
             if stage_results['initial_adjustment'] and stage_results['swap']:
                 logger.info("\n--- STAGE 2.5: Predictive Strategy - Explicit Fee Collection ---")
                 stage_results['collect_only'] = self._call_collect_fees_only(funding_account, private_key_env)
                 if not stage_results['collect_only']:
-                    raise Exception("Fee collection failed")
+                    logger.warning("Fee collection failed, but continuing test.")
             
-            # --- STAGE 3: Second Position Adjustment by Strategy Contract ---
-            if stage_results['initial_adjustment'] and stage_results['swap'] and stage_results['collect_only']:
-                logger.info("\n--- STAGE 3: Predictive Strategy - Second position adjustment ---")
-                predicted_price_final = self.get_predicted_price_from_api()
-                predicted_tick_final = None
-                if predicted_price_final is None:
-                    logger.warning("Could not get new prediction for final adjustment. Using last known pool tick.")
-                    if self.pool_contract:
-                        slot0_final = self.pool_contract.functions.slot0().call()
-                        predicted_tick_final = slot0_final[1]
-                    else:
-                        logger.error("Pool contract not available for fallback tick during final adjustment.")
-                else:
-                    predicted_tick_final = self.calculate_tick_from_price(predicted_price_final)
-                
-                if predicted_tick_final is not None:
-                    logger.info("Ensuring precise token balances for Predictive contract (final)...")
-                    if not contract_funder.ensure_precise_token_balances(
-                        self.contract_address, self.token0, self.token0_decimals, target_usdc_balance,
-                        self.token1, self.token1_decimals, target_weth_balance, private_key_env
-                    ):
-                        logger.error("Precise funding for Predictive contract failed (final).")
-                        self.metrics['error_message'] = (self.metrics.get('error_message', "") + ";Funding failed (final)").strip(';')
-                    
-                    balance0_before_final_adj, balance1_before_final_adj = self._get_contract_token_balances_individually()
-                    logger.info(f"Balances before final updatePredictionAndAdjust: Token0={balance0_before_final_adj}, Token1={balance1_before_final_adj}")
+            logger.info("\n--- STAGE 3: Predictive Strategy - Final state check ---")
+            self.metrics['action_taken'] = self.ACTION_STATES["FEES_COLLECT_ONLY_SUCCESS"] if stage_results.get('collect_only') else self.ACTION_STATES["FEES_COLLECT_ONLY_FAILED"]
 
-                    logger.info(f"Calling updatePredictionAndAdjust (final) with predictedTick: {predicted_tick_final}")
-                    tx_function_call_final = self.contract.functions.updatePredictionAndAdjust(predicted_tick_final)
-                    current_nonce = web3_utils.w3.eth.get_transaction_count(funding_account.address)
-                    tx_params_final = {'from': funding_account.address, 'nonce': current_nonce, 'chainId': web3_utils.w3.eth.chain_id}
-                    try:
-                        tx_params_final['gas'] = int(tx_function_call_final.estimate_gas({'from': funding_account.address}) * 1.25)
-                    except Exception as est_err_final:
-                        logger.warning(f"Gas estimation failed for 'updatePredictionAndAdjust' (final): {est_err_final}. Using default 1,500,000")
-                        tx_params_final['gas'] = 1500000
-                    
-                    built_tx_final = tx_function_call_final.build_transaction(tx_params_final)
-                    receipt_final = web3_utils.send_transaction(built_tx_final, private_key_env)
-                    self.metrics['tx_hash'] = receipt_final.transactionHash.hex() if receipt_final else self.metrics.get('tx_hash')
-
-                    if receipt_final and receipt_final.status == 1:
-                        logger.info(f"Final adjustment transaction successful. Tx: {receipt_final.transactionHash.hex()}")
-                        
-                        logger.info("Processing LiquidityOperation event to capture amounts from final adjustment...")
-                        try:
-                            final_mint_logs = self.contract.events.LiquidityOperation().process_receipt(receipt_final)
-                            
-                            fees_token0 = 0
-                            fees_token1 = 0
-                            for log in final_mint_logs:
-                                if log.args.operationType == "MINT":
-                                    self.metrics['amount0_provided_to_mint'] = log.args.amount0
-                                    self.metrics['amount1_provided_to_mint'] = log.args.amount1
-                                    logger.info(f"Captured Final Mint Amounts: Token0={log.args.amount0}, Token1={log.args.amount1}")
-                                elif log.args.operationType == "REMOVE":
-                                    fees_token0 += log.args.amount0 
-                                    fees_token1 += log.args.amount1 
-                                    logger.info(f"Captured Collected Amounts from REMOVE event: Token0={log.args.amount0}, Token1={log.args.amount1}")
-
-                            if self.metrics.get('fees_collected_token0') is None: self.metrics['fees_collected_token0'] = 0
-                            if self.metrics.get('fees_collected_token1') is None: self.metrics['fees_collected_token1'] = 0
-                            self.metrics['fees_collected_token0'] += fees_token0
-                            self.metrics['fees_collected_token1'] += fees_token1
-
-                        except Exception as e:
-                            logger.warning(f"Could not process LiquidityOperation event after final adjustment: {e}")
-
-                        stage_results['final_adjustment'] = True
-                    else:
-                        raise Exception("Final adjustment transaction failed")
-                else:
-                    raise Exception("Could not determine a target tick for final adjustment")
-        
         except Exception as e:
             logger.exception(f"A failure occurred in adjust_position main try-block: {e}")
 
