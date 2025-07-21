@@ -1,0 +1,41 @@
+py strategy_analyzer.py                       
+Input CSVs will be read from: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\processed_results
+Plots will be saved in: D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results
+✅ Final CSV Files loaded successfully.
+
+--- Results Summary Table (Corrected Fees) ---
+                                 Metric Predictive Strategy Baseline Strategy
+                      Time In Range (%)              100.00            100.00
+                   Total Gas Cost (ETH)            0.024628          0.035228
+              Mean Absolute Error (MAE)                8.00               N/A
+Mean Absolute Percentage Error (MAPE %)                0.23               N/A
+                 Average LP Value (USD)         $579,982.14       $333,135.82
+           Total Impermanent Loss (USD)           $2,193.53         $1,746.77
+                Total Fees Earned (USD)         $3,847.5460       $2,938.0365
+                   Total Gas Cost (USD)              $85.89           $122.70
+                  Net P&L vs HODL (USD)           $1,568.13         $1,068.56
+      Final Cumulative Actual P&L (USD)          $42,419.09        $41,559.43
+               % Periods Ended In Range              100.00           $100.00
+ Final Cumulative Net Holding P&L (USD)          $-5,804.23          $-560.52
+Plot saved: 01_predictive_price_liquidity.png
+Plot saved: 02_baseline_price_liquidity.png
+Plot saved: 03_prediction_error.png
+Plot saved: 04_actual_vs_predicted_price.png
+Plot saved: 05_rolling_time_in_range.png
+Plot saved: 06_cumulative_gas_costs_eth.png
+Plot saved: 07_lp_value_over_time.png
+Plot saved: 08_impermanent_loss_over_time.png
+Plot saved: 09_pnl_vs_hodl_per_period.png
+Plot saved: 10_cumulative_actual_pnl.png
+Plot saved: 11_cumulative_net_holding_pnl.png
+Plot saved: 12_percent_periods_ended_in_range.png
+Plot saved: 13_distribution_impermanent_loss.png
+✅ Corrected Plot 14 saved successfully.
+Plot saved: 15_KEY_fees_vs_gas.png
+Plot saved: 16_KEY_total_fees_comparison.png
+Plot saved: 17_KEY_cumulative_fees_earned.png
+Plot saved: 18_KEY_cumulative_pnl_vs_hodl.png
+Summary table image saved as D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis\plots_results\summary_table.png
+
+Analysis script finished.
+(venv) PS D:\Uni-Dex-Marketplace_test\Phase3_Smart_Contract\analysis> 

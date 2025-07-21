@@ -120,7 +120,10 @@ def process_file(input_filepath: Path, output_filepath: Path, token0_price: floa
             
     if 'gas_cost_eth' in df_out.columns:
         df_out['gas_cost_eth'] = pd.to_numeric(df_out['gas_cost_eth'], errors='coerce').round(6)
-
+    if 'timestamp' in df_out.columns:
+        df_out['timestamp'] = pd.to_datetime(df_out['timestamp'], errors='coerce', format='mixed')
+        df_out['timestamp'] = df_out['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
+    
     # --- Save the Final CSV File ---
     try:
         df_out.to_csv(output_filepath, index=False, encoding='utf-8')
